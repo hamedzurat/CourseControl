@@ -1,13 +1,10 @@
-# dependencies
+# dependencies (bun install)
 node_modules
 
 # output
 out
 dist
 *.tgz
-.wrangler
-.output
-/build
 
 # code coverage
 coverage
@@ -18,11 +15,12 @@ logs
 _.log
 report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
-# Env
+# dotenv environment variable files
 .env
-.env.*
-!.env.example
-!.env.test
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
 
 # caches
 .eslintcache
@@ -32,6 +30,5 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # IntelliJ based IDEs
 .idea
 
-# OS
+# Finder (MacOS) folder config
 .DS_Store
-Thumbs.db

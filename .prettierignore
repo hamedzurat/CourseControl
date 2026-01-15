@@ -1,0 +1,10 @@
+.cloudflare/
+.svelte-kit/
+.vercel/
+dist/
+build/
+node_modules/
+bun.lockb
+.DS_Store
+*.min.*
+*.map

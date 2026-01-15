@@ -1,0 +1,6 @@
+name = "coursecontrol-api"
+main = "src/index.ts"
+compatibility_date = "2026-01-15"
+
+[vars]
+APP_ORIGIN = "https://coursecontrol.zurat.dev"
