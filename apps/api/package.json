@@ -1,0 +1,20 @@
+{
+  "name": "@coursecontrol/api",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev src/index.ts --port 8787",
+    "deploy": "wrangler deploy src/index.ts"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260115.0",
+    "@types/bun": "latest",
+    "wrangler": "^4.59.2"
+  },
+  "peerDependencies": {
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "hono": "^4.11.4"
+  }
+}
