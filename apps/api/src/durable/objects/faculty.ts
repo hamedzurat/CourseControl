@@ -1,30 +1,30 @@
 import type { DurableObjectState } from '@cloudflare/workers-types';
 import { and, eq, inArray } from 'drizzle-orm';
 
-import { baUser, section as sectionTable, subject as subjectTable } from '../db/schema';
-import { ChatStore, deliverMessage } from '../durable/chat';
-import { AppError } from '../durable/errors';
-import { fromError, json } from '../durable/http';
-import { getSubjectKv } from '../durable/kv';
-import { getPhase } from '../durable/phase';
-import { isClientAction } from '../durable/protocol';
-import { TokenBucket } from '../durable/rate-limit';
-import { broadcast, parseJsonMessage, sendJson, upgradeToWebSocket, type AnyWebSocket } from '../durable/ws';
-import type { Env, Role } from '../env';
-import { getDb } from '../lib/db';
+import { baUser, section as sectionTable, subject as subjectTable } from '../../db/schema';
+import type { Env, Role } from '../../env';
+import { getDb } from '../../lib/db';
+import { ChatStore, deliverMessage } from '../utils/chat';
+import { AppError } from '../utils/errors';
+import { fromError, json } from '../utils/http';
+import { getSubjectKv } from '../utils/kv';
+import { getPhase } from '../utils/phase';
+import { isClientAction } from '../utils/protocol';
+import { TokenBucket } from '../utils/rate-limit';
+import { broadcast, parseJsonMessage, sendJson, upgradeToWebSocket, type AnyWebSocket } from '../utils/ws';
 
 type Identity = { userId: string; role: Role };
 
 export class FacultyDO {
   private ident: Identity | null = null;
 
-  // cache of what faculty teaches
+  /** Cache of what faculty teaches */
   private taughtSectionIds = new Set<number>();
   private taughtSubjectIds = new Set<number>();
 
   // chat + rate limit
   private chat = new ChatStore();
-  private chatBucket = new TokenBucket(1, 1); // 1 msg/sec
+  private chatBucket = new TokenBucket(1, 1); /** Rate limit: 1 msg/sec */
 
   constructor(
     private state: DurableObjectState,

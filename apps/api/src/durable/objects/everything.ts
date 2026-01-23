@@ -1,12 +1,12 @@
 import type { DurableObjectState } from '@cloudflare/workers-types';
 import { eq, inArray } from 'drizzle-orm';
 
-import { section as sectionTable } from '../db/schema';
-import { fromError, json } from '../durable/http';
-import { getPhase } from '../durable/phase';
-import { sendJson, upgradeToWebSocket, type AnyWebSocket } from '../durable/ws';
-import type { Env } from '../env';
-import { getDb } from '../lib/db';
+import { section as sectionTable } from '../../db/schema';
+import type { Env } from '../../env';
+import { getDb } from '../../lib/db';
+import { fromError, json } from '../utils/http';
+import { getPhase } from '../utils/phase';
+import { sendJson, upgradeToWebSocket, type AnyWebSocket } from '../utils/ws';
 
 type EverythingMeta = { singleton: true };
 
@@ -84,13 +84,16 @@ export class EverythingDO {
 
   /**
    * Build R2 state.json as:
+   * ```json
    * {
-   *   generatedAtMs,
-   *   source: "kv",
-   *   sections: { [sectionId]: { sectionId, maxSeats, seatsLeft, updatedAtMs, subjectId } },
-   *   stats: ...
+   *   "generatedAtMs": 123,
+   *   "source": "kv",
+   *   "sections": { ... },
+   *   "stats": ...
    * }
+   * ```
    *
+   * @remarks
    * Rules:
    * - do not include subject metadata
    * - never boot SubjectDO/SectionDO

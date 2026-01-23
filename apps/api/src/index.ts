@@ -7,7 +7,6 @@ import { actorRoute } from './routes/actor';
 import { adminDbRoute } from './routes/admin-db';
 import { adminDebugRoute } from './routes/admin-debug';
 import { authAppRoute } from './routes/auth-app';
-import { authDevRoute } from './routes/auth-dev';
 import { doStartRoute } from './routes/do-start';
 import { meRoute } from './routes/me';
 import { notificationRoute } from './routes/notification';
@@ -30,7 +29,6 @@ app.route('/seed', seedRoute);
 
 // App JWT mint endpoint (must come before /auth/* passthrough)
 app.route('/auth/app', authAppRoute);
-app.route('/auth/dev', authDevRoute);
 
 // Better Auth passthrough
 app.on(['GET', 'POST'], '/auth/*', (c) => authHandler(c.env, c.req.raw));
@@ -63,9 +61,9 @@ export default app;
 export type AppType = typeof app;
 
 // Durable Object exports
-export { StudentDO } from './actors/student';
-export { SectionDO } from './actors/section';
-export { SubjectDO } from './actors/subject';
-export { EverythingDO } from './actors/everything';
-export { FacultyDO } from './actors/faculty';
-export { AdminDO } from './actors/admin';
+export { StudentDO } from './durable/objects/student';
+export { SectionDO } from './durable/objects/section';
+export { SubjectDO } from './durable/objects/subject';
+export { EverythingDO } from './durable/objects/everything';
+export { FacultyDO } from './durable/objects/faculty';
+export { AdminDO } from './durable/objects/admin';

@@ -1,12 +1,12 @@
 import type { DurableObjectState } from '@cloudflare/workers-types';
 
-import { ChatStore, deliverMessage } from '../durable/chat';
-import { AppError } from '../durable/errors';
-import { fromError, json } from '../durable/http';
-import { isClientAction } from '../durable/protocol';
-import { TokenBucket } from '../durable/rate-limit';
-import { broadcast, parseJsonMessage, sendJson, upgradeToWebSocket, type AnyWebSocket } from '../durable/ws';
-import type { Env, Role } from '../env';
+import type { Env, Role } from '../../env';
+import { ChatStore, deliverMessage } from '../utils/chat';
+import { AppError } from '../utils/errors';
+import { fromError, json } from '../utils/http';
+import { isClientAction } from '../utils/protocol';
+import { TokenBucket } from '../utils/rate-limit';
+import { broadcast, parseJsonMessage, sendJson, upgradeToWebSocket, type AnyWebSocket } from '../utils/ws';
 
 type Identity = { userId: string; role: Role };
 
@@ -37,7 +37,7 @@ export class AdminDO {
   private ident: Identity | null = null;
 
   private chat = new ChatStore();
-  private chatBucket = new TokenBucket(1, 1); // 1 msg/sec for chat only
+  private chatBucket = new TokenBucket(1, 1); /** Rate limit: 1 msg/sec for chat */
 
   constructor(
     private state: DurableObjectState,

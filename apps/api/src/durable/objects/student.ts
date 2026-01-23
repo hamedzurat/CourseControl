@@ -1,4 +1,3 @@
-import type { DurableObjectState } from '@cloudflare/workers-types';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 
 import {
@@ -12,18 +11,19 @@ import {
   swapInvite as swapInviteTable,
   swapParticipant as swapParticipantTable,
   swap as swapTable,
-} from '../db/schema';
-import { ChatStore, deliverMessage } from '../durable/chat';
-import { AppError, asAppError } from '../durable/errors';
-import { fromError, json } from '../durable/http';
-import { inviteCode, randomId } from '../durable/ids';
-import { getSubjectKv } from '../durable/kv';
-import { getPhase } from '../durable/phase';
-import { isClientAction, type ActionName, type QueueItem, type QueueStatus } from '../durable/protocol';
-import { TokenBucket } from '../durable/rate-limit';
-import { broadcast, parseJsonMessage, sendJson, upgradeToWebSocket, type AnyWebSocket } from '../durable/ws';
-import type { Env, Role } from '../env';
-import { getDb } from '../lib/db';
+} from '../../db/schema';
+import type { Env, Role } from '../../env';
+import { getDb } from '../../lib/db';
+import { BaseDurableObject } from '../base';
+import { ChatStore, deliverMessage } from '../utils/chat';
+import { AppError, asAppError } from '../utils/errors';
+import { fromError, json } from '../utils/http';
+import { inviteCode, randomId } from '../utils/ids';
+import { getSubjectKv } from '../utils/kv';
+import { getPhase } from '../utils/phase';
+import { isClientAction, type ActionName, type QueueItem } from '../utils/protocol';
+import { TokenBucket } from '../utils/rate-limit';
+import { broadcast, parseJsonMessage, sendJson, upgradeToWebSocket, type AnyWebSocket } from '../utils/ws';
 
 type Identity = { userId: string; role: Role };
 
@@ -49,61 +49,36 @@ type CancelPayload = { queueId: string };
 type MessagePayload = { toUserId: string; text: string };
 
 type InternalApplyBody = {
-  // leader DO calls member DO
   action: ActionName;
   payload?: any;
   origin?: { leaderUserId: string; groupId?: number; swapId?: number };
 };
 
-export class StudentDO {
+export class StudentDO extends BaseDurableObject {
   private ident: Identity | null = null;
 
   private chat = new ChatStore();
-  private chatBucket = new TokenBucket(1, 1); // 1 msg/sec
+  private chatBucket = new TokenBucket(1, 1); /** Rate limit: 1 msg/sec */
 
   private processing = false;
 
-  constructor(
-    private state: DurableObjectState,
-    private env: Env,
-  ) {
+  constructor(state: any, env: any) {
+    super(state, env);
     this.state.blockConcurrencyWhile(async () => {
-      await this.initSql();
+      await this.initGenericSql();
+      await this.initStudentSql();
       await this.ensureAlarm(1_000);
       this.log('instance:start', { actorId: state.id.toString(), at: Date.now() });
     });
   }
 
-  // -------------------- SQL schema --------------------
-  private async initSql() {
+  /**
+   * Initialize SQLite schema for student data.
+   */
+  private async initStudentSql() {
     const db = await this.state.storage.sql;
 
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS meta (
-        k TEXT PRIMARY KEY NOT NULL,
-        v TEXT NOT NULL
-      );
-    `);
-
-    // queue log (append-only, statuses updated)
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS queue (
-        id TEXT PRIMARY KEY NOT NULL,
-        action TEXT NOT NULL,
-        status TEXT NOT NULL,
-        createdAtMs INTEGER NOT NULL,
-        startedAtMs INTEGER,
-        finishedAtMs INTEGER,
-        errorCode TEXT,
-        errorMessage TEXT,
-        payloadJson TEXT
-      );
-    `);
-
-    db.exec(`CREATE INDEX IF NOT EXISTS queue_created_idx ON queue(createdAtMs);`);
-    db.exec(`CREATE INDEX IF NOT EXISTS queue_status_idx ON queue(status);`);
-
-    // current selections (authoritative for the student's live UI)
+    // selections: stores the authoritative selection for this student
     db.exec(`
       CREATE TABLE IF NOT EXISTS selection (
         subjectId INTEGER PRIMARY KEY NOT NULL,
@@ -113,142 +88,18 @@ export class StudentDO {
       );
     `);
 
-    // enrollment cache
+    // cache: local copy of enrollment data from D1
     db.exec(`
       CREATE TABLE IF NOT EXISTS enrolled_subject (
         subjectId INTEGER PRIMARY KEY NOT NULL
       );
     `);
-
-    // last enrollment refresh
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS kv_cache (
-        k TEXT PRIMARY KEY NOT NULL,
-        v TEXT NOT NULL
-      );
-    `);
-  }
-
-  private async ensureAlarm(delayMs: number) {
-    await this.state.storage.setAlarm(Date.now() + delayMs);
-  }
-
-  // -------------------- Identity --------------------
-  private readIdentity(req: Request): Identity {
-    const userId = req.headers.get('x-actor-user-id') || '';
-    const role = (req.headers.get('x-actor-user-role') || '') as Role;
-    if (!userId) throw new AppError('MISSING_IDENTITY', 'Missing x-actor-user-id', 401);
-    if (!role) throw new AppError('MISSING_IDENTITY', 'Missing x-actor-user-role', 401);
-    return { userId, role };
   }
 
   private ensureStudent() {
     if (!this.ident || this.ident.role !== 'student') throw new AppError('FORBIDDEN', 'Student actor only', 403);
   }
 
-  // -------------------- Helpers: queue --------------------
-  private async insertQueue(item: QueueItem) {
-    const db = await this.state.storage.sql;
-    db.exec(
-      `INSERT INTO queue (id, action, status, createdAtMs, payloadJson) VALUES (?, ?, ?, ?, ?);`,
-      item.id,
-      item.action,
-      item.status,
-      item.createdAtMs,
-      item.payload ? JSON.stringify(item.payload) : null,
-    );
-  }
-
-  private async updateQueue(id: string, patch: Partial<QueueItem>) {
-    const db = await this.state.storage.sql;
-
-    const status = patch.status ?? null;
-    const startedAtMs = patch.startedAtMs ?? null;
-    const finishedAtMs = patch.finishedAtMs ?? null;
-    const errorCode = patch.error?.code ?? null;
-    const errorMessage = patch.error?.message ?? null;
-
-    db.exec(
-      `UPDATE queue
-       SET status = COALESCE(?, status),
-           startedAtMs = COALESCE(?, startedAtMs),
-           finishedAtMs = COALESCE(?, finishedAtMs),
-           errorCode = COALESCE(?, errorCode),
-           errorMessage = COALESCE(?, errorMessage)
-       WHERE id = ?;`,
-      status,
-      startedAtMs,
-      finishedAtMs,
-      errorCode,
-      errorMessage,
-      id,
-    );
-
-    const row = db
-      .exec(
-        `SELECT id, action, status, createdAtMs, startedAtMs, finishedAtMs, errorCode, errorMessage, payloadJson
-         FROM queue WHERE id=? LIMIT 1;`,
-        id,
-      )
-      .toArray()[0] as any;
-
-    if (row) {
-      const out: QueueItem = {
-        id: row.id,
-        action: row.action,
-        status: row.status,
-        createdAtMs: row.createdAtMs,
-        startedAtMs: row.startedAtMs ?? undefined,
-        finishedAtMs: row.finishedAtMs ?? undefined,
-        error: row.errorCode ? { code: row.errorCode, message: row.errorMessage ?? '' } : undefined,
-        payload: row.payloadJson ? JSON.parse(row.payloadJson) : undefined,
-      };
-
-      broadcast(this.state, { type: 'queue_update', item: out } as any);
-    }
-  }
-
-  private async nextQueued(): Promise<{ id: string; action: ActionName; payload: any } | null> {
-    const db = await this.state.storage.sql;
-    const rows = db
-      .exec(
-        `SELECT id, action, payloadJson
-         FROM queue
-         WHERE status='queued'
-         ORDER BY createdAtMs ASC
-         LIMIT 1;`,
-      )
-      .toArray() as any[];
-
-    if (!rows.length) return null;
-    return {
-      id: rows[0].id,
-      action: rows[0].action,
-      payload: rows[0].payloadJson ? JSON.parse(rows[0].payloadJson) : undefined,
-    };
-  }
-
-  private async cancelQueued(id: string): Promise<boolean> {
-    const db = await this.state.storage.sql;
-    const rows = db.exec(`SELECT status FROM queue WHERE id=? LIMIT 1;`, id).toArray() as any[];
-    if (!rows.length) return false;
-    if (rows[0].status !== 'queued') return false;
-    db.exec(`UPDATE queue SET status='cancelled', finishedAtMs=? WHERE id=?;`, Date.now(), id);
-    await this.updateQueue(id, { status: 'cancelled' });
-    return true;
-  }
-
-  private async cancelAllQueued(): Promise<number> {
-    const db = await this.state.storage.sql;
-    const rows = db.exec(`SELECT id FROM queue WHERE status='queued';`).toArray() as any[];
-    for (const r of rows) {
-      db.exec(`UPDATE queue SET status='cancelled', finishedAtMs=? WHERE id=?;`, Date.now(), r.id);
-      await this.updateQueue(r.id, { status: 'cancelled' });
-    }
-    return rows.length;
-  }
-
-  // -------------------- Helpers: selection + conflict --------------------
   private async currentSelections(): Promise<{ subjectId: number; sectionId: number; timeslotMask: number }[]> {
     const db = await this.state.storage.sql;
     return db.exec(`SELECT subjectId, sectionId, timeslotMask FROM selection ORDER BY subjectId;`).toArray() as any;
@@ -300,7 +151,7 @@ export class StudentDO {
     const rows = db.exec(`SELECT v FROM kv_cache WHERE k='enroll_refreshedAtMs' LIMIT 1;`).toArray() as any[];
     if (!rows.length) return true;
     const t = Number(rows[0].v);
-    return !Number.isFinite(t) || Date.now() - t > 60_000; // refresh every 60s
+    return !Number.isFinite(t) || Date.now() - t > 60_000;
   }
 
   private async refreshEnrollmentIfNeeded() {
@@ -416,10 +267,9 @@ export class StudentDO {
     if (!(await this.isEnrolled(info.subjectId)))
       throw new AppError('NOT_ENROLLED', 'Not enrolled for this subject', 403);
 
-    // already selected this subject?
     const existing = await this.selectionForSubject(info.subjectId);
     if (existing) {
-      if (existing.sectionId === sectionId) return; // idempotent
+      if (existing.sectionId === sectionId) return;
       throw new AppError('ALREADY_SELECTED', 'Use change() to move within subject', 409);
     }
 
@@ -439,7 +289,7 @@ export class StudentDO {
     if (!Number.isFinite(subjectId) || subjectId <= 0) throw new AppError('BAD_REQUEST', 'subjectId required', 400);
 
     const existing = await this.selectionForSubject(subjectId);
-    if (!existing) return; // idempotent
+    if (!existing) return;
 
     await this.sectionDrop(existing.sectionId);
     await this.deleteSelection(subjectId);
@@ -468,10 +318,8 @@ export class StudentDO {
     if (await this.conflictWith(toInfo.timeslotMask, toInfo.subjectId))
       throw new AppError('CONFLICT', 'Timeslot conflict', 409);
 
-    // Per your rule: send request to destination with info of previous section
     await this.sectionChangeFrom(toSectionId, existing.sectionId);
 
-    // Then drop old; if drop fails, revert by dropping destination best-effort
     try {
       await this.sectionDrop(existing.sectionId);
     } catch {
@@ -515,9 +363,6 @@ export class StudentDO {
   }
 
   private async handleGroupCreate(payload: GroupCreatePayload) {
-    // const { phase } = await getPhase(this.env);
-    // if (phase !== 'selection') throw new AppError('PHASE_NOT_SELECTION', 'Not in selection phase', 409);
-
     const subjectId = Number(payload?.subjectId);
     if (!Number.isFinite(subjectId) || subjectId <= 0) throw new AppError('BAD_REQUEST', 'subjectId required', 400);
 
@@ -538,7 +383,6 @@ export class StudentDO {
     const groupId = inserted[0]?.id;
     if (!groupId) throw new AppError('GROUP_CREATE_FAILED', 'Failed to create group', 500);
 
-    // leader is also member
     await db
       .insert(groupMemberTable)
       .values({
@@ -550,9 +394,6 @@ export class StudentDO {
   }
 
   private async handleGroupInvite(payload: GroupInvitePayload) {
-    // const { phase } = await getPhase(this.env);
-    // if (phase !== 'selection') throw new AppError('PHASE_NOT_SELECTION', 'Not in selection phase', 409);
-
     const groupId = Number(payload?.groupId);
     const count = Number(payload?.count ?? 0);
     const expiresInMs = payload?.expiresInMs ? Number(payload.expiresInMs) : null;
@@ -579,7 +420,6 @@ export class StudentDO {
       })),
     );
 
-    // send them to client via status
     sendJsonToAll(this.state, {
       type: 'status',
       nowMs: Date.now(),
@@ -588,9 +428,6 @@ export class StudentDO {
   }
 
   private async handleGroupJoin(payload: GroupJoinPayload) {
-    // const { phase } = await getPhase(this.env);
-    // if (phase !== 'selection') throw new AppError('PHASE_NOT_SELECTION', 'Not in selection phase', 409);
-
     const code = String(payload?.code ?? '').trim();
     if (!code) throw new AppError('BAD_REQUEST', 'code required', 400);
 
@@ -666,7 +503,6 @@ export class StudentDO {
 
     await this.requireGroupUnlocked(groupId);
     const db = getDb(this.env);
-    // cascade deletes invites/members via FK if configured; but D1 FKs aren’t always enforced.
     await db.delete(groupInviteTable).where(eq(groupInviteTable.groupId, groupId));
     await db.delete(groupMemberTable).where(eq(groupMemberTable.groupId, groupId));
     await db.delete(groupTable).where(eq(groupTable.id, groupId));
@@ -707,7 +543,6 @@ export class StudentDO {
 
     try {
       const members = await this.groupMembers(groupId);
-      // leader executes for everyone (including leader)
       for (const m of members) {
         await this.callMemberApply(m, 'take', { sectionId }, { leaderUserId: this.ident!.userId, groupId });
       }
@@ -890,10 +725,8 @@ export class StudentDO {
 
     if (leader.status !== 'open') throw new AppError('SWAP_NOT_OPEN', 'Swap not open', 409);
 
-    // Lock swap
     await db.update(swapTable).set({ status: 'locked' }).where(eq(swapTable.id, swapId));
 
-    // Transaction: apply changes to section_selection
     const participants = await db
       .select({
         userId: swapParticipantTable.userId,
@@ -905,10 +738,6 @@ export class StudentDO {
 
     if (participants.length < 2) throw new AppError('SWAP_TOO_SMALL', 'Need at least 2 participants', 409);
 
-    // Build mapping user -> wantSectionId
-    // We apply per participant: update their subject selection to want section's subject.
-    // (Assumption: swaps are within same subject; if cross-subject allowed, you must define rules.)
-    // We'll enforce same subject for give/want here.
     const wantInfos = await Promise.all(participants.map((p) => this.getSectionInfo(p.wantSectionId)));
     const giveInfos = await Promise.all(participants.map((p) => this.getSectionInfo(p.giveSectionId)));
 
@@ -921,8 +750,7 @@ export class StudentDO {
     const subjectId = wantInfos[0].subjectId;
 
     await db.transaction(async (tx) => {
-      // capacity check for each target section (count current + incoming)
-      const targets = new Map<number, number>(); // sectionId -> incoming count
+      const targets = new Map<number, number>();
       for (const p of participants) targets.set(p.wantSectionId, (targets.get(p.wantSectionId) ?? 0) + 1);
 
       for (const [targetSectionId, incoming] of targets.entries()) {
@@ -933,6 +761,12 @@ export class StudentDO {
           .limit(1);
         if (!capRow.length) throw new AppError('SECTION_NOT_FOUND', `section ${targetSectionId} not found`, 404);
 
+        /**
+         * SWAP Phase Logic:
+         * In this phase, SectionDO takes are disabled (`phase !== 'selection'`),
+         * so D1 `sectionSelection` IS the authoritative source of truth.
+         * We rely on the D1 transaction to serialize checks and prevent overfill.
+         */
         const countRow = await tx
           .select({ c: sectionSelection.studentUserId })
           .from(sectionSelection)
@@ -940,25 +774,20 @@ export class StudentDO {
 
         const currentCount = countRow.length;
         const maxSeats = capRow[0].maxSeats;
-        // In swap, those "giving up" seats might be in different sections; we don't net them here.
-        // That is conservative; if you want netting within same target, we can compute net flow later.
         if (currentCount + incoming > maxSeats) {
           throw new AppError('SECTION_FULL', `target section ${targetSectionId} lacks capacity`, 409);
         }
       }
 
-      // conflict check for each participant: ensure want timeslot doesn't overlap their other selections
       for (let i = 0; i < participants.length; i++) {
         const p = participants[i];
         const want = wantInfos[i];
 
-        // get all current selections for user
         const sels = await tx
           .select({ subjectId: sectionSelection.subjectId, sectionId: sectionSelection.sectionId })
           .from(sectionSelection)
           .where(eq(sectionSelection.studentUserId, p.userId));
 
-        // join to get masks
         const sectionIds = sels.map((s) => s.sectionId);
         const secRows = sectionIds.length
           ? await tx
@@ -973,7 +802,7 @@ export class StudentDO {
 
         let union = 0;
         for (const r of secRows) {
-          if (r.subjectId === subjectId) continue; // ignore same-subject current, since we replace it
+          if (r.subjectId === subjectId) continue;
           union |= r.timeslotMask;
         }
         if ((union & want.timeslotMask) !== 0) {
@@ -981,7 +810,6 @@ export class StudentDO {
         }
       }
 
-      // apply updates
       const nowMs = Date.now();
       for (const p of participants) {
         await tx
@@ -1001,7 +829,6 @@ export class StudentDO {
       await tx.update(swapTable).set({ status: 'executed', executedAtMs: Date.now() }).where(eq(swapTable.id, swapId));
     });
 
-    // Notify participants to sync internal state from D1
     for (const p of participants) {
       const ns = this.env.STUDENT_DO;
       const stub = ns.get(ns.idFromName(p.userId));
@@ -1019,7 +846,6 @@ export class StudentDO {
     if (!this.ident) return;
     const db = getDb(this.env);
 
-    // read student's selections from D1 truth
     const rows = await db
       .select({
         subjectId: sectionSelection.subjectId,
@@ -1028,7 +854,6 @@ export class StudentDO {
       .from(sectionSelection)
       .where(eq(sectionSelection.studentUserId, this.ident.userId));
 
-    // load masks
     const sectionIds = rows.map((r) => r.sectionId);
     const secRows = sectionIds.length
       ? await db
@@ -1051,7 +876,7 @@ export class StudentDO {
     const selections = await this.currentSelections();
     const extras = await this.loadExtras();
 
-    // queue summary: last 20
+    // queue summary from reusable DB
     const sdb = await this.state.storage.sql;
     const q = sdb
       .exec(
@@ -1062,7 +887,7 @@ export class StudentDO {
       )
       .toArray() as any[];
 
-    const queue = q.reverse().map((row) => ({
+    const queue: QueueItem[] = q.reverse().map((row) => ({
       id: row.id,
       action: row.action,
       status: row.status,
@@ -1081,14 +906,12 @@ export class StudentDO {
     } as any);
   }
 
-  // inside class StudentDO
   private extraCache: { atMs: number; data: any } | null = null;
 
   private async loadExtras() {
     const now = Date.now();
     if (this.extraCache && now - this.extraCache.atMs < 5_000) return this.extraCache.data;
 
-    // enrolledSubjectIds from DO storage
     const sdb = await this.state.storage.sql;
     const enrolledRows = sdb.exec(`SELECT subjectId FROM enrolled_subject ORDER BY subjectId;`).toArray() as any[];
     const enrolledSubjectIds = enrolledRows.map((r) => Number(r.subjectId));
@@ -1181,7 +1004,6 @@ export class StudentDO {
 
   async alarm() {
     try {
-      // Only do periodic pushes if someone is connected
       const sockets = this.state.getWebSockets();
       if (sockets.length) {
         await this.pushStatus();
@@ -1201,19 +1023,19 @@ export class StudentDO {
 
     try {
       while (true) {
-        const next = await this.nextQueued();
+        const next = await this.queue.next();
         if (!next) break;
 
-        await this.updateQueue(next.id, { status: 'running', startedAtMs: Date.now() });
+        await this.queue.update(next.id, { status: 'running', startedAtMs: Date.now() });
         this.log('queue:run', { id: next.id, action: next.action, payload: next.payload });
 
         try {
           await this.applyAction(next.action, next.payload);
-          await this.updateQueue(next.id, { status: 'ok', finishedAtMs: Date.now() });
+          await this.queue.update(next.id, { status: 'ok', finishedAtMs: Date.now() });
           this.log('queue:ok', { id: next.id, action: next.action });
         } catch (e) {
           const err = asAppError(e);
-          await this.updateQueue(next.id, {
+          await this.queue.update(next.id, {
             status: 'error',
             finishedAtMs: Date.now(),
             error: { code: err.code, message: err.message },
@@ -1264,7 +1086,6 @@ export class StudentDO {
       case 'swap_exec':
         return this.handleSwapExec(payload as SwapExecPayload);
 
-      // cancel actions are handled before queuing
       case 'cancel':
       case 'cancel_all':
         return;
@@ -1280,7 +1101,6 @@ export class StudentDO {
         this.chat.addOut(toUserId, text);
         await deliverMessage(this.env, this.ident!.userId, toUserId, text);
 
-        // echo to client
         broadcast(this.state, {
           type: 'chat',
           nowMs: Date.now(),
@@ -1292,7 +1112,7 @@ export class StudentDO {
       }
 
       case 'status':
-        return; // handled by pushStatus
+        return;
     }
   }
 
@@ -1307,7 +1127,6 @@ export class StudentDO {
         this.ensureStudent();
         this.log('ws:connect', { userId: ident.userId, role: ident.role });
 
-        // enrollment cache warmup
         await this.refreshEnrollmentIfNeeded();
 
         const { response, server } = upgradeToWebSocket(this.state);
@@ -1316,28 +1135,22 @@ export class StudentDO {
           { type: 'hello', actor: 'student', userId: ident.userId, role: ident.role, nowMs: Date.now() } as any,
         );
 
-        // immediate push
         await this.pushStatus();
         await this.pushSeatStatus();
 
         return response;
       }
 
-      // internal: group leader applying to member
       if (url.pathname === '/internal/apply' && req.method === 'POST') {
         if (req.headers.get('x-internal-call') !== '1') throw new AppError('FORBIDDEN', 'internal only', 403);
 
-        // we must have identity to apply; in group/swap internal calls we infer studentId from DO name
-        // but DO name isn't accessible; so we require that the DO was already initialized via WS at least once,
-        // or we accept a header override (leader can set it) – simplest: require WS first.
         if (!this.ident) throw new AppError('NOT_READY', 'StudentDO not initialized; connect ws once first', 409);
 
         const body = (await req.json().catch(() => null)) as InternalApplyBody | null;
         if (!body?.action) throw new AppError('BAD_REQUEST', 'action required', 400);
 
-        // log as synthetic queue item (append-only)
         const qid = randomId(16);
-        await this.insertQueue({
+        await this.queue.insert({
           id: qid,
           action: body.action,
           status: 'queued',
@@ -1349,7 +1162,6 @@ export class StudentDO {
           item: { id: qid, action: body.action, status: 'queued', createdAtMs: Date.now(), payload: body.payload },
         } as any);
 
-        // process immediately
         await this.processQueueIfNeeded();
         return json({ ok: true });
       }
@@ -1362,7 +1174,6 @@ export class StudentDO {
         return json({ ok: true });
       }
 
-      // receive chat from other DOs
       if (url.pathname === '/message' && req.method === 'POST') {
         const body = (await req.json().catch(() => null)) as null | {
           fromUserId: string;
@@ -1402,10 +1213,9 @@ export class StudentDO {
     if (!this.ident) return;
     this.ensureStudent();
 
-    // Cancel actions are immediate (no queue insert)
     if (msg.action === 'cancel') {
       const p = msg.payload as CancelPayload;
-      const ok = await this.cancelQueued(String(p?.queueId ?? ''));
+      const ok = await this.queue.cancel(String(p?.queueId ?? ''));
       if (!ok)
         sendJson(
           ws as any,
@@ -1420,11 +1230,10 @@ export class StudentDO {
     }
 
     if (msg.action === 'cancel_all') {
-      await this.cancelAllQueued();
+      await this.queue.cancelAll();
       return;
     }
 
-    // Enqueue everything else (including message, so it logs too)
     const q: QueueItem = {
       id: msg.id || randomId(16),
       action: msg.action,
@@ -1433,10 +1242,9 @@ export class StudentDO {
       payload: msg.payload,
     };
 
-    await this.insertQueue(q);
+    await this.queue.insert(q);
     broadcast(this.state, { type: 'queue_update', item: q } as any);
 
-    // kick processor
     await this.processQueueIfNeeded();
   }
 
@@ -1451,8 +1259,7 @@ export class StudentDO {
   }
 }
 
-// small helper to send a server msg to all sockets without importing more
-function sendJsonToAll(state: DurableObjectState, msg: any) {
+function sendJsonToAll(state: any, msg: any) {
   const sockets = state.getWebSockets() as any[];
   for (const ws of sockets) {
     try {

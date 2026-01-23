@@ -51,11 +51,14 @@ export async function runMigrations(env: Env) {
       scope TEXT,
       idToken TEXT,
       sessionState TEXT,
+      password TEXT,
       createdAt INTEGER NOT NULL,
       updatedAt INTEGER NOT NULL,
       FOREIGN KEY (userId) REFERENCES "user"(id)
     );
   `);
+  // Try to add password column if it doesn't exist (migrations are append-only hack here)
+  stmts.push(`ALTER TABLE account ADD COLUMN password TEXT;`);
   stmts.push(`CREATE INDEX IF NOT EXISTS account_user_idx ON account(userId);`);
   stmts.push(`CREATE UNIQUE INDEX IF NOT EXISTS account_provider_ux ON account(providerId, providerAccountId);`);
 

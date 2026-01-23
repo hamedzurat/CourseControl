@@ -1,4 +1,4 @@
-import type { Env } from '../env';
+import type { Env } from '../../env';
 
 export async function getSubjectKv(env: Env, subjectId: number | string): Promise<any | null> {
   const key = `subject:${subjectId}`;

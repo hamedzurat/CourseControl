@@ -1,8 +1,8 @@
 import { eq } from 'drizzle-orm';
 
-import { baUser } from '../db/schema';
-import type { Env, Role } from '../env';
-import { getDb } from '../lib/db';
+import { baUser } from '../../db/schema';
+import type { Env, Role } from '../../env';
+import { getDb } from '../../lib/db';
 import { AppError } from './errors';
 
 type CacheEntry = { role: Role; expiresAtMs: number };

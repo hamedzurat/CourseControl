@@ -15,10 +15,10 @@ function makeKey(userId: string, routeKey: string): Key {
  * - allows 1 request per `windowMs` for (routeKey, userId)
  * - returns 429 with retryAfterSeconds
  *
- * Notes:
- * - This is isolate-local, not globally consistent across all Worker instances.
- *   For polling this is usually acceptable. If you want hard global limits,
- *   we'd move this to a DO or KV later.
+ * @remarks
+ * This is isolate-local, not globally consistent across all Worker instances.
+ * For polling this is usually acceptable. If you want hard global limits,
+ * we'd move this to a DO or KV later.
  */
 export function limitPerUser(
   windowMs: number,

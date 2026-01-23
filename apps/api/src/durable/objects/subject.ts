@@ -1,10 +1,10 @@
 import type { DurableObjectState } from '@cloudflare/workers-types';
 
-import { AppError } from '../durable/errors';
-import { fromError, json } from '../durable/http';
-import { getPhase } from '../durable/phase';
-import { sendJson, upgradeToWebSocket, type AnyWebSocket } from '../durable/ws';
-import type { Env } from '../env';
+import type { Env } from '../../env';
+import { AppError } from '../utils/errors';
+import { fromError, json } from '../utils/http';
+import { getPhase } from '../utils/phase';
+import { sendJson, upgradeToWebSocket, type AnyWebSocket } from '../utils/ws';
 
 type UpdateBody = {
   subjectId: number;
@@ -41,7 +41,7 @@ export class SubjectDO {
       );
     `);
 
-    // latest section seat data
+    /** Latest section seat data */
     db.exec(`
       CREATE TABLE IF NOT EXISTS section_state (
         sectionId INTEGER PRIMARY KEY NOT NULL,
@@ -51,7 +51,7 @@ export class SubjectDO {
       );
     `);
 
-    // optional history log (small; can be expanded later)
+    /** Optional history log (small; can be expanded later) */
     db.exec(`
       CREATE TABLE IF NOT EXISTS update_log (
         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,

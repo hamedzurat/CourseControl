@@ -1,4 +1,4 @@
-import type { Env, Role } from '../env';
+import type { Env, Role } from '../../env';
 import { AppError } from './errors';
 import { resolveUserRole } from './user-role';
 

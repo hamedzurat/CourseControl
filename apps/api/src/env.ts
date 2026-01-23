@@ -1,5 +1,8 @@
 export type Role = 'student' | 'faculty' | 'admin';
 
+/**
+ * Cloudflare Worker Environment/Bindings
+ */
 export type Env = {
   // ---- Cloudflare storage ----
   DB: D1Database;

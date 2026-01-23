@@ -39,7 +39,7 @@ meRoute.get('/', async (c) => {
 
   const user = userRows[0];
 
-  // shared-ish
+  /** Enrolled subjects */
   const enrollments = await db
     .select({
       subjectId: subjectTable.id,
@@ -68,7 +68,7 @@ meRoute.get('/', async (c) => {
     .where(eq(sectionSelection.studentUserId, u.id))
     .orderBy(subjectTable.code, sectionTable.sectionNumber);
 
-  // groups (student)
+  /** Group memberships */
   const groups = await db
     .select({
       groupId: groupTable.id,
@@ -82,7 +82,7 @@ meRoute.get('/', async (c) => {
     .where(eq(groupMemberTable.studentUserId, u.id))
     .orderBy(desc(groupTable.createdAtMs));
 
-  // swaps: leader or participant
+  /** Swap participation (leader or participant) */
   const leaderSwapIds = await db.select({ id: swapTable.id }).from(swapTable).where(eq(swapTable.leaderUserId, u.id));
   const partSwapIds = await db
     .select({ id: swapParticipantTable.swapId })
@@ -118,7 +118,7 @@ meRoute.get('/', async (c) => {
         .where(inArray(swapParticipantTable.swapId, swapIds))
     : [];
 
-  // role-specific profile
+  /** Role-specific profile data */
   let profile: any = null;
   if (u.role === 'student') {
     const r = await db.select().from(studentTable).where(eq(studentTable.userId, u.id)).limit(1);

@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 
 import {
+  account,
   admin as adminTable,
   baUser,
   enrollment,
@@ -10,10 +11,12 @@ import {
   phaseSchedule,
   section,
   sectionSelection,
+  session,
   student as studentTable,
   subject,
 } from '../db/schema';
 import type { Env } from '../env';
+import { getAuth } from '../lib/auth';
 import { getDb } from '../lib/db';
 import { runMigrations } from '../lib/migrate';
 import seed from '../seed.json';
@@ -50,39 +53,65 @@ seedRoute.get('/:secret', async (c) => {
     upserted: {},
   };
 
-  // ---- users ----
+  /** Users */
   if (Array.isArray(s.users) && s.users.length) {
-    const nowIso = new Date().toISOString();
-    await db
-      .insert(baUser)
-      .values(
-        s.users.map((u: any) => ({
-          id: String(u.id),
-          name: String(u.name ?? 'User'),
-          email: String(u.email),
-          emailVerified: u.emailVerified ? 1 : 0,
-          image: u.image ? String(u.image) : null,
-          role: String(u.role ?? 'student'),
-          createdAt: String(u.createdAt ?? nowIso),
-          updatedAt: String(u.updatedAt ?? nowIso),
-        })),
-      )
-      .onConflictDoUpdate({
-        target: baUser.id,
-        set: {
-          name: baUser.name,
-          email: baUser.email,
-          emailVerified: baUser.emailVerified,
-          image: baUser.image,
-          role: baUser.role,
-          updatedAt: nowIso,
-        } as any,
-      });
+    const auth = getAuth(c.env);
+    const password = 'password'; // Default password for all seed users
 
+    for (const u of s.users) {
+      const email = String(u.email);
+      const targetId = String(u.id);
+      const name = String(u.name ?? 'User');
+      const role = String(u.role ?? 'student');
+
+      // Check if user exists
+      const existing = await db.select().from(baUser).where(eq(baUser.email, email)).limit(1);
+
+      if (existing.length === 0) {
+        // Create user via Better Auth to handle password hashing
+        try {
+          const res = await auth.api.signUpEmail({
+            body: {
+              email,
+              password,
+              name,
+            },
+            asResponse: false,
+          });
+
+          // If ID differs (expected), path it to match seed ID
+          if (res?.user?.id && res.user.id !== targetId) {
+            const tempId = res.user.id;
+            // Update user ID
+            await db.update(baUser).set({ id: targetId, role, emailVerified: 1 }).where(eq(baUser.id, tempId));
+            // Update relations that Better Auth created (account, session)
+            await db.update(account).set({ userId: targetId }).where(eq(account.userId, tempId));
+            await db.update(session).set({ userId: targetId }).where(eq(session.userId, tempId));
+          } else {
+            // ID matched or failed (should not happen with default generation, but handle update)
+            await db.update(baUser).set({ role, emailVerified: 1 }).where(eq(baUser.id, targetId));
+          }
+        } catch (e) {
+          console.error(`Failed to seed user ${email}:`, e);
+        }
+      } else {
+        // Update existing user role/verification
+        await db
+          .update(baUser)
+          .set({
+            name,
+            role,
+            emailVerified: 1,
+            image: u.image ? String(u.image) : baUser.image,
+            updatedAt: new Date().toISOString(),
+          })
+          .where(eq(baUser.email, email));
+      }
+    }
     summary.upserted.users = s.users.length;
   }
 
-  // ---- role tables ----
+  /** Role tables */
   if (Array.isArray(s.admins) && s.admins.length) {
     await db
       .insert(adminTable)
@@ -119,7 +148,7 @@ seedRoute.get('/:secret', async (c) => {
     summary.upserted.students = s.students.length;
   }
 
-  // ---- phase schedule ----
+  /** Phase schedule */
   if (s.phaseSchedule) {
     const ps = s.phaseSchedule;
     await db.insert(phaseSchedule).values({
@@ -132,7 +161,7 @@ seedRoute.get('/:secret', async (c) => {
     summary.upserted.phaseSchedule = 1;
   }
 
-  // ---- subjects ----
+  /** Subjects */
   if (Array.isArray(s.subjects) && s.subjects.length) {
     await db
       .insert(subject)
@@ -159,7 +188,7 @@ seedRoute.get('/:secret', async (c) => {
     summary.upserted.subjects = s.subjects.length;
   }
 
-  // ---- sections ----
+  /** Sections */
   if (Array.isArray(s.sections) && s.sections.length) {
     await db
       .insert(section)
@@ -188,7 +217,7 @@ seedRoute.get('/:secret', async (c) => {
     summary.upserted.sections = s.sections.length;
   }
 
-  // ---- enrollments ----
+  /** Enrollments */
   if (Array.isArray(s.enrollments) && s.enrollments.length) {
     await db
       .insert(enrollment)
@@ -202,7 +231,7 @@ seedRoute.get('/:secret', async (c) => {
     summary.upserted.enrollments = s.enrollments.length;
   }
 
-  // ---- optional initial selections ----
+  /** Initial Selections */
   if (Array.isArray(s.sectionSelections) && s.sectionSelections.length) {
     await db
       .insert(sectionSelection)

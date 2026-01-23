@@ -58,6 +58,7 @@ export const account = sqliteTable(
     scope: text('scope'),
     idToken: text('idToken'),
     sessionState: text('sessionState'),
+    password: text('password'), // Add password for credential provider
     createdAt: integer('createdAt').notNull(),
     updatedAt: integer('updatedAt').notNull(),
   },
@@ -94,9 +95,7 @@ export const jwks = sqliteTable(
   }),
 );
 
-/**
- * Role profile tables
- */
+/** Role profile tables */
 export const admin = sqliteTable('admin', {
   userId: text('userId')
     .primaryKey()
@@ -117,9 +116,7 @@ export const student = sqliteTable('student', {
   advisorUserId: text('advisorUserId').references(() => baUser.id),
 });
 
-/**
- * Phase scheduling
- */
+/** Phase scheduling */
 export const phaseSchedule = sqliteTable(
   'phase_schedule',
   {
@@ -135,9 +132,7 @@ export const phaseSchedule = sqliteTable(
   }),
 );
 
-/**
- * Catalog: subjects & sections
- */
+/** Catalog: subjects & sections */
 export const subject = sqliteTable(
   'subject',
   {
@@ -176,9 +171,7 @@ export const section = sqliteTable(
   }),
 );
 
-/**
- * Student is allowed to operate only on enrolled subjects (business rule)
- */
+/** Enrollment: Student is allowed to operate only on enrolled subjects (business rule) */
 export const enrollment = sqliteTable(
   'enrollment',
   {
@@ -195,9 +188,7 @@ export const enrollment = sqliteTable(
   }),
 );
 
-/**
- * Selection truth in D1 (used for swaps + snapshots)
- */
+/** Selection truth in D1 (used for swaps + snapshots) */
 export const sectionSelection = sqliteTable(
   'section_selection',
   {
@@ -219,9 +210,7 @@ export const sectionSelection = sqliteTable(
   }),
 );
 
-/**
- * Groups (for selection phase)
- */
+/** Groups (for selection phase) */
 export const group = sqliteTable(
   'group',
   {
@@ -277,9 +266,7 @@ export const groupInvite = sqliteTable(
   }),
 );
 
-/**
- * Swaps (swap phase)
- */
+/** Swaps (swap phase) */
 export const swap = sqliteTable(
   'swap',
   {
@@ -339,9 +326,7 @@ export const swapParticipant = sqliteTable(
   }),
 );
 
-/**
- * Notifications (REST)
- */
+/** Notifications (REST) */
 export const notification = sqliteTable(
   'notification',
   {

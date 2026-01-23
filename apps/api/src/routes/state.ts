@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 
-import { getPhase } from '../durable/phase';
+import { getPhase } from '../durable/utils/phase';
 import type { Env } from '../env';
 
 export const stateRoute = new Hono<{ Bindings: Env }>();

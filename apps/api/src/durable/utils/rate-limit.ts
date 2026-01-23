@@ -1,7 +1,8 @@
 /**
  * Simple token-bucket rate limiter (in-memory).
- * - capacity: max tokens
- * - refillPerSec: tokens added per second
+ *
+ * @param capacity - max tokens
+ * @param refillPerSec - tokens added per second
  */
 export class TokenBucket {
   private tokens: number;

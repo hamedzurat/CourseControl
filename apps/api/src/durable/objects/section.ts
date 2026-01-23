@@ -1,13 +1,13 @@
 import type { DurableObjectState } from '@cloudflare/workers-types';
 import { and, eq } from 'drizzle-orm';
 
-import { notification as notificationTable, sectionSelection, section as sectionTable } from '../db/schema';
-import { AppError, asAppError } from '../durable/errors';
-import { fromError, json } from '../durable/http';
-import { getPhase } from '../durable/phase';
-import { broadcast, parseJsonMessage, sendJson, upgradeToWebSocket, type AnyWebSocket } from '../durable/ws';
-import type { Env } from '../env';
-import { getDb } from '../lib/db';
+import { notification as notificationTable, sectionSelection, section as sectionTable } from '../../db/schema';
+import type { Env } from '../../env';
+import { getDb } from '../../lib/db';
+import { AppError, asAppError } from '../utils/errors';
+import { fromError, json } from '../utils/http';
+import { getPhase } from '../utils/phase';
+import { broadcast, parseJsonMessage, sendJson, upgradeToWebSocket, type AnyWebSocket } from '../utils/ws';
 
 type SectionMeta = {
   sectionId: number;
@@ -29,10 +29,9 @@ export class SectionDO {
     private state: DurableObjectState,
     private env: Env,
   ) {
-    // ensure internal tables exist
     this.state.blockConcurrencyWhile(async () => {
       await this.initSql();
-      // schedule periodic snapshots
+      /** Schedule periodic snapshots */
       await this.ensureAlarm(1_000);
       this.log('instance:start', { actorId: state.id.toString(), at: Date.now() });
     });
@@ -40,7 +39,7 @@ export class SectionDO {
 
   private async initSql() {
     const db = await this.state.storage.sql;
-    // meta: single row
+
     db.exec(`
       CREATE TABLE IF NOT EXISTS meta (
         k TEXT PRIMARY KEY NOT NULL,
@@ -210,7 +209,11 @@ export class SectionDO {
     const db = getDb(this.env);
     const members = await this.readMembers();
 
-    // We write the authoritative truth: for each student, their selection for this subject is this section.
+    /**
+     * Authoritative Sync:
+     * We overwrite the D1 state with our local truth. This ensures that even if
+     * D1 was stale or incorrect, the DO's state eventually prevails.
+     */
     // Since key is (studentUserId, subjectId), we upsert those rows.
     // Also: removing students from this section doesn't remove their selection for subject if they've moved elsewhere,
     // but StudentDO/SectionDO workflow should ensure correctness. We'll keep it simple: upsert existing members.
