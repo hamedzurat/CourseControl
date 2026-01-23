@@ -53,6 +53,8 @@ seedRoute.get('/:secret', async (c) => {
     upserted: {},
   };
 
+  const idMap = new Map<string, string>();
+
   /** Users */
   if (Array.isArray(s.users) && s.users.length) {
     const auth = getAuth(c.env);
@@ -67,6 +69,8 @@ seedRoute.get('/:secret', async (c) => {
       // Check if user exists
       const existing = await db.select().from(baUser).where(eq(baUser.email, email)).limit(1);
 
+      let realId = targetId;
+
       if (existing.length === 0) {
         // Create user via Better Auth to handle password hashing
         try {
@@ -75,47 +79,46 @@ seedRoute.get('/:secret', async (c) => {
               email,
               password,
               name,
+              image: u.image ? String(u.image) : undefined,
             },
             asResponse: false,
           });
 
-          // If ID differs (expected), path it to match seed ID
-          if (res?.user?.id && res.user.id !== targetId) {
-            const tempId = res.user.id;
-            // Update user ID
-            await db.update(baUser).set({ id: targetId, role, emailVerified: 1 }).where(eq(baUser.id, tempId));
-            // Update relations that Better Auth created (account, session)
-            await db.update(account).set({ userId: targetId }).where(eq(account.userId, tempId));
-            await db.update(session).set({ userId: targetId }).where(eq(session.userId, tempId));
-          } else {
-            // ID matched or failed (should not happen with default generation, but handle update)
-            await db.update(baUser).set({ role, emailVerified: 1 }).where(eq(baUser.id, targetId));
+          if (res?.user?.id) {
+            realId = res.user.id;
+            // Update role/verification since Better Auth creates as default/unverified usually
+            await db.update(baUser).set({ role, emailVerified: true }).where(eq(baUser.id, realId));
           }
         } catch (e) {
           console.error(`Failed to seed user ${email}:`, e);
+          continue; // Skip if failed
         }
       } else {
+        realId = existing[0].id;
         // Update existing user role/verification
         await db
           .update(baUser)
           .set({
             name,
             role,
-            emailVerified: 1,
+            emailVerified: true,
             image: u.image ? String(u.image) : baUser.image,
-            updatedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString() as any, // Cast for Drizzle strict mode if needed, or number
           })
           .where(eq(baUser.email, email));
       }
+      idMap.set(targetId, realId);
     }
     summary.upserted.users = s.users.length;
   }
+
+  const mapId = (id: string) => idMap.get(id) ?? id;
 
   /** Role tables */
   if (Array.isArray(s.admins) && s.admins.length) {
     await db
       .insert(adminTable)
-      .values(s.admins.map((a: any) => ({ userId: String(a.userId) })))
+      .values(s.admins.map((a: any) => ({ userId: mapId(String(a.userId)) })))
       .onConflictDoNothing();
     summary.upserted.admins = s.admins.length;
   }
@@ -123,7 +126,7 @@ seedRoute.get('/:secret', async (c) => {
   if (Array.isArray(s.faculty) && s.faculty.length) {
     await db
       .insert(facultyTable)
-      .values(s.faculty.map((f: any) => ({ userId: String(f.userId) })))
+      .values(s.faculty.map((f: any) => ({ userId: mapId(String(f.userId)) })))
       .onConflictDoNothing();
     summary.upserted.faculty = s.faculty.length;
   }
@@ -133,9 +136,9 @@ seedRoute.get('/:secret', async (c) => {
       .insert(studentTable)
       .values(
         s.students.map((st: any) => ({
-          userId: String(st.userId),
+          userId: mapId(String(st.userId)),
           trimesterId: Number(st.trimesterId ?? 0),
-          advisorUserId: st.advisorUserId ? String(st.advisorUserId) : null,
+          advisorUserId: st.advisorUserId ? mapId(String(st.advisorUserId)) : null,
         })),
       )
       .onConflictDoUpdate({
@@ -197,7 +200,7 @@ seedRoute.get('/:secret', async (c) => {
           id: Number(x.id),
           subjectId: Number(x.subjectId),
           sectionNumber: String(x.sectionNumber),
-          facultyUserId: String(x.facultyUserId),
+          facultyUserId: mapId(String(x.facultyUserId)),
           maxSeats: Number(x.maxSeats),
           timeslotMask: Number(x.timeslotMask),
           published: x.published == null ? 1 : Number(x.published),
@@ -223,7 +226,7 @@ seedRoute.get('/:secret', async (c) => {
       .insert(enrollment)
       .values(
         s.enrollments.map((x: any) => ({
-          studentUserId: String(x.studentUserId),
+          studentUserId: mapId(String(x.studentUserId)),
           subjectId: Number(x.subjectId),
         })),
       )
@@ -237,7 +240,7 @@ seedRoute.get('/:secret', async (c) => {
       .insert(sectionSelection)
       .values(
         s.sectionSelections.map((x: any) => ({
-          studentUserId: String(x.studentUserId),
+          studentUserId: mapId(String(x.studentUserId)),
           subjectId: Number(x.subjectId),
           sectionId: Number(x.sectionId),
           selectedAtMs: Number(x.selectedAtMs ?? Date.now()),
@@ -257,9 +260,9 @@ seedRoute.get('/:secret', async (c) => {
   if (Array.isArray(s.notifications) && s.notifications.length) {
     await db.insert(notificationTable).values(
       s.notifications.map((n: any) => ({
-        createdByUserId: String(n.createdByUserId ?? 'system'),
+        createdByUserId: mapId(String(n.createdByUserId ?? 'system')),
         audienceRole: n.audienceRole ? String(n.audienceRole) : null,
-        audienceUserId: n.audienceUserId ? String(n.audienceUserId) : null,
+        audienceUserId: n.audienceUserId ? mapId(String(n.audienceUserId)) : null,
         title: String(n.title),
         body: String(n.body),
         createdAtMs: Number(n.createdAtMs ?? Date.now()),

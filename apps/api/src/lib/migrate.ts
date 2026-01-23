@@ -28,14 +28,17 @@ export async function runMigrations(env: Env) {
     CREATE TABLE IF NOT EXISTS session (
       id TEXT PRIMARY KEY NOT NULL,
       userId TEXT NOT NULL,
+      token TEXT NOT NULL,
       expiresAt INTEGER NOT NULL,
       ipAddress TEXT,
       userAgent TEXT,
       createdAt INTEGER NOT NULL,
+      updatedAt INTEGER NOT NULL,
       FOREIGN KEY (userId) REFERENCES "user"(id)
     );
   `);
   stmts.push(`CREATE INDEX IF NOT EXISTS session_user_idx ON session(userId);`);
+  stmts.push(`CREATE UNIQUE INDEX IF NOT EXISTS session_token_ux ON session(token);`);
   stmts.push(`CREATE INDEX IF NOT EXISTS session_exp_idx ON session(expiresAt);`);
 
   stmts.push(`
@@ -43,10 +46,11 @@ export async function runMigrations(env: Env) {
       id TEXT PRIMARY KEY NOT NULL,
       userId TEXT NOT NULL,
       providerId TEXT NOT NULL,
-      providerAccountId TEXT NOT NULL,
+      accountId TEXT NOT NULL,
       accessToken TEXT,
       refreshToken TEXT,
-      expiresAt INTEGER,
+      accessTokenExpiresAt INTEGER,
+      refreshTokenExpiresAt INTEGER,
       tokenType TEXT,
       scope TEXT,
       idToken TEXT,
@@ -60,14 +64,16 @@ export async function runMigrations(env: Env) {
   // Try to add password column if it doesn't exist (migrations are append-only hack here)
   stmts.push(`ALTER TABLE account ADD COLUMN password TEXT;`);
   stmts.push(`CREATE INDEX IF NOT EXISTS account_user_idx ON account(userId);`);
-  stmts.push(`CREATE UNIQUE INDEX IF NOT EXISTS account_provider_ux ON account(providerId, providerAccountId);`);
+  stmts.push(`CREATE UNIQUE INDEX IF NOT EXISTS account_provider_ux ON account(providerId, accountId);`);
 
   stmts.push(`
     CREATE TABLE IF NOT EXISTS verification (
       id TEXT PRIMARY KEY NOT NULL,
       identifier TEXT NOT NULL,
       value TEXT NOT NULL,
-      expiresAt INTEGER NOT NULL
+      expiresAt INTEGER NOT NULL,
+      createdAt INTEGER,
+      updatedAt INTEGER
     );
   `);
   stmts.push(`CREATE INDEX IF NOT EXISTS verification_ident_idx ON verification(identifier);`);
@@ -287,6 +293,17 @@ export async function runMigrations(env: Env) {
   for (const sql of stmts) {
     const trimmed = sql.trim();
     if (!trimmed) continue;
-    await env.DB.prepare(trimmed).run();
+    try {
+      await env.DB.prepare(trimmed).run();
+    } catch (e: any) {
+      // Ignore "duplicate column name" errors (for our cheap ALTER TABLE hack)
+      // Also ignore "table X already exists" if D1 throws specific error codes not caught by IF NOT EXISTS (rare but possible)
+      const msg = String(e?.message || e?.cause?.message || '');
+      if (msg.includes('duplicate column name') || msg.includes('already exists')) {
+        // ignore
+        continue;
+      }
+      throw e;
+    }
   }
 }

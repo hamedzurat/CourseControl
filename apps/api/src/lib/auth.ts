@@ -3,6 +3,7 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { bearer, captcha, jwt, multiSession } from 'better-auth/plugins';
 import { oneTimeToken } from 'better-auth/plugins/one-time-token';
 
+import * as schema from '../db/schema';
 import type { Env, Role } from '../env';
 import { getDb } from './db';
 import { signAppJwt, verifyAppJwt } from './jwt';
@@ -68,7 +69,13 @@ export function getAuth(env: Env) {
     baseURL: env.BETTER_AUTH_BASE_URL,
     basePath: '/auth',
 
-    database: drizzleAdapter(db as any, { provider: 'sqlite' }),
+    database: drizzleAdapter(db, {
+      provider: 'sqlite',
+      schema: {
+        ...schema,
+        user: schema.baUser,
+      },
+    }),
 
     emailAndPassword: {
       enabled: true,

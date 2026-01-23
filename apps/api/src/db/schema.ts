@@ -11,12 +11,12 @@ export const baUser = sqliteTable(
     id: text('id').primaryKey(), // Better Auth uses string ids
     name: text('name').notNull(),
     email: text('email').notNull(),
-    emailVerified: integer('emailVerified').notNull().default(0), // 0/1
+    emailVerified: integer('emailVerified', { mode: 'boolean' }).notNull().default(false),
     image: text('image'),
     // Custom field for CourseControl:
     role: text('role').notNull().default('student'),
-    createdAt: text('createdAt').notNull(), // ISO string for simplicity
-    updatedAt: text('updatedAt').notNull(),
+    createdAt: integer('createdAt', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer('updatedAt', { mode: 'timestamp_ms' }).notNull(),
   },
   (t) => ({
     emailUx: uniqueIndex('user_email_ux').on(t.email),
@@ -31,13 +31,16 @@ export const session = sqliteTable(
     userId: text('userId')
       .notNull()
       .references(() => baUser.id),
-    expiresAt: integer('expiresAt').notNull(), // ms
+    token: text('token').notNull(),
+    expiresAt: integer('expiresAt', { mode: 'timestamp_ms' }).notNull(),
     ipAddress: text('ipAddress'),
     userAgent: text('userAgent'),
-    createdAt: integer('createdAt').notNull(),
+    createdAt: integer('createdAt', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer('updatedAt', { mode: 'timestamp_ms' }).notNull(),
   },
   (t) => ({
     userIdx: index('session_user_idx').on(t.userId),
+    tokenUx: uniqueIndex('session_token_ux').on(t.token),
     expIdx: index('session_exp_idx').on(t.expiresAt),
   }),
 );
@@ -50,21 +53,22 @@ export const account = sqliteTable(
       .notNull()
       .references(() => baUser.id),
     providerId: text('providerId').notNull(), // e.g. "google"
-    providerAccountId: text('providerAccountId').notNull(),
+    accountId: text('accountId').notNull(),
     accessToken: text('accessToken'),
     refreshToken: text('refreshToken'),
-    expiresAt: integer('expiresAt'),
+    accessTokenExpiresAt: integer('accessTokenExpiresAt', { mode: 'timestamp_ms' }),
+    refreshTokenExpiresAt: integer('refreshTokenExpiresAt', { mode: 'timestamp_ms' }),
     tokenType: text('tokenType'),
     scope: text('scope'),
     idToken: text('idToken'),
     sessionState: text('sessionState'),
     password: text('password'), // Add password for credential provider
-    createdAt: integer('createdAt').notNull(),
-    updatedAt: integer('updatedAt').notNull(),
+    createdAt: integer('createdAt', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer('updatedAt', { mode: 'timestamp_ms' }).notNull(),
   },
   (t) => ({
     userIdx: index('account_user_idx').on(t.userId),
-    providerUx: uniqueIndex('account_provider_ux').on(t.providerId, t.providerAccountId),
+    providerUx: uniqueIndex('account_provider_ux').on(t.providerId, t.accountId),
   }),
 );
 
@@ -74,7 +78,9 @@ export const verification = sqliteTable(
     id: text('id').primaryKey(),
     identifier: text('identifier').notNull(), // email or whatever
     value: text('value').notNull(), // token/code hash
-    expiresAt: integer('expiresAt').notNull(),
+    expiresAt: integer('expiresAt', { mode: 'timestamp_ms' }).notNull(),
+    createdAt: integer('createdAt', { mode: 'timestamp_ms' }),
+    updatedAt: integer('updatedAt', { mode: 'timestamp_ms' }),
   },
   (t) => ({
     identIdx: index('verification_ident_idx').on(t.identifier),
@@ -88,7 +94,7 @@ export const jwks = sqliteTable(
     id: text('id').primaryKey(),
     kid: text('kid').notNull(),
     key: text('key').notNull(), // JWK JSON string
-    createdAt: integer('createdAt').notNull(),
+    createdAt: integer('createdAt', { mode: 'timestamp_ms' }).notNull(),
   },
   (t) => ({
     kidUx: uniqueIndex('jwks_kid_ux').on(t.kid),
