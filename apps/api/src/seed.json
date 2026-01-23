@@ -1,0 +1,164 @@
+{
+  "users": [
+    {
+      "id": "u_admin_1",
+      "name": "Admin One",
+      "email": "admin1@example.com",
+      "role": "admin",
+      "emailVerified": 1
+    },
+    {
+      "id": "u_fac_1",
+      "name": "Faculty A",
+      "email": "fac1@example.com",
+      "role": "faculty",
+      "emailVerified": 1
+    },
+    {
+      "id": "u_fac_2",
+      "name": "Faculty B",
+      "email": "fac2@example.com",
+      "role": "faculty",
+      "emailVerified": 1
+    },
+    {
+      "id": "u_stu_1",
+      "name": "Student 1",
+      "email": "stu1@example.com",
+      "role": "student",
+      "emailVerified": 1
+    },
+    {
+      "id": "u_stu_2",
+      "name": "Student 2",
+      "email": "stu2@example.com",
+      "role": "student",
+      "emailVerified": 1
+    },
+    {
+      "id": "u_stu_3",
+      "name": "Student 3",
+      "email": "stu3@example.com",
+      "role": "student",
+      "emailVerified": 1
+    },
+    {
+      "id": "u_stu_4",
+      "name": "Student 4",
+      "email": "stu4@example.com",
+      "role": "student",
+      "emailVerified": 1
+    }
+  ],
+
+  "admins": [{ "userId": "u_admin_1" }],
+  "faculty": [{ "userId": "u_fac_1" }, { "userId": "u_fac_2" }],
+  "students": [
+    { "userId": "u_stu_1", "trimesterId": 20261 },
+    { "userId": "u_stu_2", "trimesterId": 20261 },
+    { "userId": "u_stu_3", "trimesterId": 20261 },
+    { "userId": "u_stu_4", "trimesterId": 20261 }
+  ],
+
+  "phaseSchedule": {
+    "selectionStartMs": 1769088025839,
+    "selectionEndMs": 1769588025839,
+    "swapStartMs": 1769588925839,
+    "swapEndMs": 1769988925839
+  },
+
+  "subjects": [
+    { "id": 101, "code": "CSE101", "name": "Intro to CS", "type": "theory", "credits": 3, "published": 1 },
+    { "id": 201, "code": "MAT201", "name": "Discrete Math", "type": "theory", "credits": 3, "published": 1 },
+    { "id": 301, "code": "ENG301", "name": "Technical Writing", "type": "lab", "credits": 2, "published": 1 }
+  ],
+
+  "sections": [
+    {
+      "id": 1001,
+      "subjectId": 101,
+      "sectionNumber": "A",
+      "facultyUserId": "u_fac_1",
+      "maxSeats": 2,
+      "timeslotMask": 1,
+      "published": 1
+    },
+    {
+      "id": 1011,
+      "subjectId": 101,
+      "sectionNumber": "Z",
+      "facultyUserId": "u_fac_1",
+      "maxSeats": 2,
+      "timeslotMask": 1,
+      "published": 1
+    },
+    {
+      "id": 1002,
+      "subjectId": 101,
+      "sectionNumber": "B",
+      "facultyUserId": "u_fac_2",
+      "maxSeats": 2,
+      "timeslotMask": 2,
+      "published": 1
+    },
+
+    {
+      "id": 2001,
+      "subjectId": 201,
+      "sectionNumber": "A",
+      "facultyUserId": "u_fac_1",
+      "maxSeats": 3,
+      "timeslotMask": 4,
+      "published": 1
+    },
+    {
+      "id": 2002,
+      "subjectId": 201,
+      "sectionNumber": "B",
+      "facultyUserId": "u_fac_2",
+      "maxSeats": 3,
+      "timeslotMask": 8,
+      "published": 1
+    },
+
+    {
+      "id": 3001,
+      "subjectId": 301,
+      "sectionNumber": "A",
+      "facultyUserId": "u_fac_2",
+      "maxSeats": 4,
+      "timeslotMask": 16,
+      "published": 1
+    }
+  ],
+
+  "enrollments": [
+    { "studentUserId": "u_stu_1", "subjectId": 101 },
+    { "studentUserId": "u_stu_1", "subjectId": 201 },
+
+    { "studentUserId": "u_stu_2", "subjectId": 101 },
+    { "studentUserId": "u_stu_2", "subjectId": 201 },
+
+    { "studentUserId": "u_stu_3", "subjectId": 101 },
+    { "studentUserId": "u_stu_3", "subjectId": 301 },
+
+    { "studentUserId": "u_stu_4", "subjectId": 201 },
+    { "studentUserId": "u_stu_4", "subjectId": 301 }
+  ],
+
+  "sectionSelections": [],
+  "_sectionSelections": [
+    { "studentUserId": "u_stu_1", "subjectId": 101, "sectionId": 1001 },
+    { "studentUserId": "u_stu_2", "subjectId": 101, "sectionId": 1002 }
+  ],
+
+  "notifications": [
+    {
+      "createdByUserId": "u_admin_1",
+      "audienceRole": null,
+      "audienceUserId": null,
+      "title": "Welcome",
+      "body": "Seed completed. Start selection phase soon."
+    }
+  ]
+}

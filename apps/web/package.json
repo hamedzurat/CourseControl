@@ -14,18 +14,24 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@coursecontrol/shared": "workspace:*"
+    "@coursecontrol/shared": "workspace:*",
+    "@nanostores/persistent": "^1.2.0",
+    "better-auth": "^1.4.17",
+    "mode-watcher": "^1.1.0",
+    "nanostores": "^1.1.0"
   },
   "devDependencies": {
     "@eslint/compat": "^1.4.0",
     "@eslint/js": "^9.39.1",
-    "@lucide/svelte": "^0.562.0",
+    "@internationalized/date": "^3.10.0",
+    "@lucide/svelte": "^0.561.0",
     "@sveltejs/adapter-auto": "^7.0.0",
     "@sveltejs/adapter-cloudflare": "^7.2.4",
     "@sveltejs/kit": "^2.49.1",
     "@sveltejs/vite-plugin-svelte": "^6.2.1",
     "@tailwindcss/vite": "^4.1.17",
     "@types/node": "^22",
+    "bits-ui": "^2.14.4",
     "clsx": "^2.1.1",
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",

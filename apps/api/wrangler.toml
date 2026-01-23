@@ -1,6 +1,42 @@
-name = "coursecontrol-api"
+name = "coursecontrol"
 main = "src/index.ts"
-compatibility_date = "2026-01-15"
+compatibility_date = "2026-01-14"
+compatibility_flags = ["nodejs_compat"]
 
-[vars]
-APP_ORIGIN = "https://coursecontrol.zurat.dev"
+# ---------- D1 ----------
+[[d1_databases]]
+binding = "DB"
+database_name = "coursecontrol"
+database_id = "REPLACE_ME"
+
+# ---------- KV ----------
+[[kv_namespaces]]
+binding = "KV_SUBJECT"
+id = "REPLACE_ME"
+
+# ---------- R2 ----------
+[[r2_buckets]]
+binding = "R2_STATE"
+bucket_name = "coursecontrol-state"
+
+# ---------- Durable Objects ----------
+[durable_objects]
+bindings = [
+    { name = "STUDENT_DO", class_name = "StudentDO" },
+    { name = "SECTION_DO", class_name = "SectionDO" },
+    { name = "SUBJECT_DO", class_name = "SubjectDO" },
+    { name = "EVERYTHING_DO", class_name = "EverythingDO" },
+    { name = "ADMIN_DO", class_name = "AdminDO" },
+    { name = "FACULTY_DO", class_name = "FacultyDO" },
+]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = [
+    "StudentDO",
+    "SectionDO",
+    "SubjectDO",
+    "EverythingDO",
+    "AdminDO",
+    "FacultyDO",
+]

@@ -4,18 +4,24 @@
   "type": "module",
   "scripts": {
     "deploy": "wrangler deploy src/index.ts",
-    "dev": "wrangler dev src/index.ts --port 8787"
+    "dev": "wrangler dev src/index.ts --port 8787",
+    "test": "vitest run",
+    "types": "wrangler types"
   },
   "dependencies": {
     "@coursecontrol/shared": "workspace:*",
-    "hono": "^4.11.4"
+    "better-auth": "^1.4.13",
+    "drizzle-orm": "^0.45.1",
+    "hono": "^4.11.4",
+    "jose": "^5.9.6",
+    "nanoid": "^5.1.6"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260115.0",
+    "@cloudflare/vitest-pool-workers": "^0.12.4",
     "@types/bun": "latest",
+    "@types/node": "^25.0.9",
+    "typescript": "^5.9.3",
+    "vitest": "~3.2.0",
     "wrangler": "^4.59.2"
-  },
-  "peerDependencies": {
-    "typescript": "^5.9.3"
   }
 }
