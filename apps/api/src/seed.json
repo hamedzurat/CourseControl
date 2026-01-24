@@ -2,163 +2,703 @@
   "users": [
     {
       "id": "u_admin_1",
-      "name": "Admin One",
-      "email": "admin1@example.com",
+      "name": "Admin",
+      "email": "admin@uiu.bd",
       "role": "admin",
       "emailVerified": 1
     },
     {
       "id": "u_fac_1",
-      "name": "Faculty A",
-      "email": "fac1@example.com",
+      "name": "Prof. Ahmed Rahman",
+      "email": "fac1@uiu.bd",
       "role": "faculty",
       "emailVerified": 1
     },
     {
       "id": "u_fac_2",
-      "name": "Faculty B",
-      "email": "fac2@example.com",
+      "name": "Prof. Sadia Islam",
+      "email": "fac2@uiu.bd",
+      "role": "faculty",
+      "emailVerified": 1
+    },
+    {
+      "id": "u_fac_3",
+      "name": "Prof. Kamal Rahman",
+      "email": "fac3@uiu.bd",
+      "role": "faculty",
+      "emailVerified": 1
+    },
+    {
+      "id": "u_fac_4",
+      "name": "Prof. Fatima Ahmed",
+      "email": "fac4@uiu.bd",
       "role": "faculty",
       "emailVerified": 1
     },
     {
       "id": "u_stu_1",
-      "name": "Student 1",
-      "email": "stu1@example.com",
+      "name": "Rubel Khan",
+      "email": "stu1@uiu.bd",
       "role": "student",
       "emailVerified": 1
     },
     {
       "id": "u_stu_2",
-      "name": "Student 2",
-      "email": "stu2@example.com",
+      "name": "Farhana Khatun",
+      "email": "stu2@uiu.bd",
       "role": "student",
       "emailVerified": 1
     },
     {
       "id": "u_stu_3",
-      "name": "Student 3",
-      "email": "stu3@example.com",
+      "name": "Ayesha Khatun",
+      "email": "stu3@uiu.bd",
       "role": "student",
       "emailVerified": 1
     },
     {
       "id": "u_stu_4",
-      "name": "Student 4",
-      "email": "stu4@example.com",
+      "name": "Hassan Mia",
+      "email": "stu4@uiu.bd",
+      "role": "student",
+      "emailVerified": 1
+    },
+    {
+      "id": "u_stu_5",
+      "name": "Rafiq Chowdhury",
+      "email": "stu5@uiu.bd",
+      "role": "student",
+      "emailVerified": 1
+    },
+    {
+      "id": "u_stu_6",
+      "name": "Abdul Akter",
+      "email": "stu6@uiu.bd",
+      "role": "student",
+      "emailVerified": 1
+    },
+    {
+      "id": "u_stu_7",
+      "name": "Sadia Ahmed",
+      "email": "stu7@uiu.bd",
+      "role": "student",
+      "emailVerified": 1
+    },
+    {
+      "id": "u_stu_8",
+      "name": "Rubel Siddique",
+      "email": "stu8@uiu.bd",
+      "role": "student",
+      "emailVerified": 1
+    },
+    {
+      "id": "u_stu_9",
+      "name": "Karim Mia",
+      "email": "stu9@uiu.bd",
+      "role": "student",
+      "emailVerified": 1
+    },
+    {
+      "id": "u_stu_10",
+      "name": "Rahim Akter",
+      "email": "stu10@uiu.bd",
       "role": "student",
       "emailVerified": 1
     }
   ],
-
-  "admins": [{ "userId": "u_admin_1" }],
-  "faculty": [{ "userId": "u_fac_1" }, { "userId": "u_fac_2" }],
+  "admins": [
+    {
+      "userId": "u_admin_1"
+    }
+  ],
+  "faculty": [
+    {
+      "userId": "u_fac_1"
+    },
+    {
+      "userId": "u_fac_2"
+    },
+    {
+      "userId": "u_fac_3"
+    },
+    {
+      "userId": "u_fac_4"
+    }
+  ],
   "students": [
-    { "userId": "u_stu_1", "trimesterId": 20261 },
-    { "userId": "u_stu_2", "trimesterId": 20261 },
-    { "userId": "u_stu_3", "trimesterId": 20261 },
-    { "userId": "u_stu_4", "trimesterId": 20261 }
+    {
+      "userId": "u_stu_1",
+      "trimesterId": 261
+    },
+    {
+      "userId": "u_stu_2",
+      "trimesterId": 261
+    },
+    {
+      "userId": "u_stu_3",
+      "trimesterId": 261
+    },
+    {
+      "userId": "u_stu_4",
+      "trimesterId": 261
+    },
+    {
+      "userId": "u_stu_5",
+      "trimesterId": 261
+    },
+    {
+      "userId": "u_stu_6",
+      "trimesterId": 261
+    },
+    {
+      "userId": "u_stu_7",
+      "trimesterId": 261
+    },
+    {
+      "userId": "u_stu_8",
+      "trimesterId": 261
+    },
+    {
+      "userId": "u_stu_9",
+      "trimesterId": 261
+    },
+    {
+      "userId": "u_stu_10",
+      "trimesterId": 261
+    }
   ],
-
-  "phaseSchedule": {
-    "selectionStartMs": 1769088025839,
-    "selectionEndMs": 1769588025839,
-    "swapStartMs": 1769588925839,
-    "swapEndMs": 1769988925839
-  },
-
   "subjects": [
-    { "id": 101, "code": "CSE101", "name": "Intro to CS", "type": "theory", "credits": 3, "published": 1 },
-    { "id": 201, "code": "MAT201", "name": "Discrete Math", "type": "theory", "credits": 3, "published": 1 },
-    { "id": 301, "code": "ENG301", "name": "Technical Writing", "type": "lab", "credits": 2, "published": 1 }
+    {
+      "id": 101,
+      "code": "CSE101",
+      "name": "Structured Programming",
+      "type": "theory",
+      "credits": 3,
+      "published": 1
+    },
+    {
+      "id": 102,
+      "code": "CSE102",
+      "name": "Structured Programming Lab",
+      "type": "lab",
+      "credits": 1,
+      "published": 1
+    },
+    {
+      "id": 103,
+      "code": "CSE203",
+      "name": "Data Structures",
+      "type": "theory",
+      "credits": 3,
+      "published": 1
+    },
+    {
+      "id": 104,
+      "code": "CSE204",
+      "name": "Data Structures Lab",
+      "type": "lab",
+      "credits": 1,
+      "published": 1
+    },
+    {
+      "id": 105,
+      "code": "CSE205",
+      "name": "Object Oriented Programming",
+      "type": "theory",
+      "credits": 3,
+      "published": 1
+    },
+    {
+      "id": 106,
+      "code": "CSE206",
+      "name": "Object Oriented Programming Lab",
+      "type": "lab",
+      "credits": 1,
+      "published": 1
+    },
+    {
+      "id": 107,
+      "code": "CSE301",
+      "name": "Database Management Systems",
+      "type": "theory",
+      "credits": 3,
+      "published": 1
+    },
+    {
+      "id": 108,
+      "code": "CSE302",
+      "name": "Database Management Systems Lab",
+      "type": "lab",
+      "credits": 1,
+      "published": 1
+    }
   ],
-
   "sections": [
     {
       "id": 1001,
       "subjectId": 101,
       "sectionNumber": "A",
-      "facultyUserId": "u_fac_1",
-      "maxSeats": 2,
-      "timeslotMask": 1,
-      "published": 1
-    },
-    {
-      "id": 1011,
-      "subjectId": 101,
-      "sectionNumber": "Z",
-      "facultyUserId": "u_fac_1",
-      "maxSeats": 2,
-      "timeslotMask": 1,
+      "facultyUserId": "u_fac_4",
+      "maxSeats": 5,
+      "timeslotMask": 33554432,
       "published": 1
     },
     {
       "id": 1002,
       "subjectId": 101,
       "sectionNumber": "B",
-      "facultyUserId": "u_fac_2",
-      "maxSeats": 2,
-      "timeslotMask": 2,
+      "facultyUserId": "u_fac_3",
+      "maxSeats": 4,
+      "timeslotMask": 262144,
       "published": 1
     },
-
     {
-      "id": 2001,
-      "subjectId": 201,
-      "sectionNumber": "A",
+      "id": 1003,
+      "subjectId": 101,
+      "sectionNumber": "C",
+      "facultyUserId": "u_fac_3",
+      "maxSeats": 5,
+      "timeslotMask": 16777216,
+      "published": 1
+    },
+    {
+      "id": 1004,
+      "subjectId": 101,
+      "sectionNumber": "D",
       "facultyUserId": "u_fac_1",
       "maxSeats": 3,
+      "timeslotMask": 256,
+      "published": 1
+    },
+    {
+      "id": 1005,
+      "subjectId": 101,
+      "sectionNumber": "E",
+      "facultyUserId": "u_fac_4",
+      "maxSeats": 4,
+      "timeslotMask": 32768,
+      "published": 1
+    },
+    {
+      "id": 1006,
+      "subjectId": 102,
+      "sectionNumber": "A",
+      "facultyUserId": "u_fac_2",
+      "maxSeats": 3,
+      "timeslotMask": 192,
+      "published": 1
+    },
+    {
+      "id": 1007,
+      "subjectId": 102,
+      "sectionNumber": "B",
+      "facultyUserId": "u_fac_2",
+      "maxSeats": 3,
+      "timeslotMask": 12288,
+      "published": 1
+    },
+    {
+      "id": 1008,
+      "subjectId": 102,
+      "sectionNumber": "C",
+      "facultyUserId": "u_fac_4",
+      "maxSeats": 5,
+      "timeslotMask": 786432,
+      "published": 1
+    },
+    {
+      "id": 1009,
+      "subjectId": 103,
+      "sectionNumber": "A",
+      "facultyUserId": "u_fac_1",
+      "maxSeats": 4,
+      "timeslotMask": 16,
+      "published": 1
+    },
+    {
+      "id": 1010,
+      "subjectId": 103,
+      "sectionNumber": "B",
+      "facultyUserId": "u_fac_2",
+      "maxSeats": 3,
+      "timeslotMask": 4194304,
+      "published": 1
+    },
+    {
+      "id": 1011,
+      "subjectId": 103,
+      "sectionNumber": "C",
+      "facultyUserId": "u_fac_1",
+      "maxSeats": 4,
+      "timeslotMask": 536870912,
+      "published": 1
+    },
+    {
+      "id": 1012,
+      "subjectId": 104,
+      "sectionNumber": "A",
+      "facultyUserId": "u_fac_2",
+      "maxSeats": 5,
+      "timeslotMask": 786432,
+      "published": 1
+    },
+    {
+      "id": 1013,
+      "subjectId": 104,
+      "sectionNumber": "B",
+      "facultyUserId": "u_fac_4",
+      "maxSeats": 3,
+      "timeslotMask": 786432,
+      "published": 1
+    },
+    {
+      "id": 1014,
+      "subjectId": 104,
+      "sectionNumber": "C",
+      "facultyUserId": "u_fac_3",
+      "maxSeats": 5,
+      "timeslotMask": 48,
+      "published": 1
+    },
+    {
+      "id": 1015,
+      "subjectId": 105,
+      "sectionNumber": "A",
+      "facultyUserId": "u_fac_2",
+      "maxSeats": 5,
+      "timeslotMask": 268435456,
+      "published": 1
+    },
+    {
+      "id": 1016,
+      "subjectId": 105,
+      "sectionNumber": "B",
+      "facultyUserId": "u_fac_1",
+      "maxSeats": 3,
+      "timeslotMask": 32,
+      "published": 1
+    },
+    {
+      "id": 1017,
+      "subjectId": 105,
+      "sectionNumber": "C",
+      "facultyUserId": "u_fac_3",
+      "maxSeats": 4,
+      "timeslotMask": 2097152,
+      "published": 1
+    },
+    {
+      "id": 1018,
+      "subjectId": 105,
+      "sectionNumber": "D",
+      "facultyUserId": "u_fac_4",
+      "maxSeats": 4,
       "timeslotMask": 4,
       "published": 1
     },
     {
-      "id": 2002,
-      "subjectId": 201,
-      "sectionNumber": "B",
-      "facultyUserId": "u_fac_2",
-      "maxSeats": 3,
-      "timeslotMask": 8,
+      "id": 1019,
+      "subjectId": 105,
+      "sectionNumber": "E",
+      "facultyUserId": "u_fac_4",
+      "maxSeats": 5,
+      "timeslotMask": 16,
       "published": 1
     },
-
     {
-      "id": 3001,
-      "subjectId": 301,
+      "id": 1020,
+      "subjectId": 106,
+      "sectionNumber": "A",
+      "facultyUserId": "u_fac_2",
+      "maxSeats": 5,
+      "timeslotMask": 768,
+      "published": 1
+    },
+    {
+      "id": 1021,
+      "subjectId": 106,
+      "sectionNumber": "B",
+      "facultyUserId": "u_fac_4",
+      "maxSeats": 3,
+      "timeslotMask": 201326592,
+      "published": 1
+    },
+    {
+      "id": 1022,
+      "subjectId": 106,
+      "sectionNumber": "C",
+      "facultyUserId": "u_fac_3",
+      "maxSeats": 5,
+      "timeslotMask": 48,
+      "published": 1
+    },
+    {
+      "id": 1023,
+      "subjectId": 106,
+      "sectionNumber": "D",
+      "facultyUserId": "u_fac_3",
+      "maxSeats": 3,
+      "timeslotMask": 12,
+      "published": 1
+    },
+    {
+      "id": 1024,
+      "subjectId": 107,
+      "sectionNumber": "A",
+      "facultyUserId": "u_fac_4",
+      "maxSeats": 3,
+      "timeslotMask": 67108864,
+      "published": 1
+    },
+    {
+      "id": 1025,
+      "subjectId": 107,
+      "sectionNumber": "B",
+      "facultyUserId": "u_fac_4",
+      "maxSeats": 3,
+      "timeslotMask": 32,
+      "published": 1
+    },
+    {
+      "id": 1026,
+      "subjectId": 107,
+      "sectionNumber": "C",
+      "facultyUserId": "u_fac_2",
+      "maxSeats": 5,
+      "timeslotMask": 65536,
+      "published": 1
+    },
+    {
+      "id": 1027,
+      "subjectId": 107,
+      "sectionNumber": "D",
+      "facultyUserId": "u_fac_4",
+      "maxSeats": 5,
+      "timeslotMask": 8388608,
+      "published": 1
+    },
+    {
+      "id": 1028,
+      "subjectId": 107,
+      "sectionNumber": "E",
+      "facultyUserId": "u_fac_2",
+      "maxSeats": 4,
+      "timeslotMask": 512,
+      "published": 1
+    },
+    {
+      "id": 1029,
+      "subjectId": 108,
       "sectionNumber": "A",
       "facultyUserId": "u_fac_2",
       "maxSeats": 4,
-      "timeslotMask": 16,
+      "timeslotMask": 192,
+      "published": 1
+    },
+    {
+      "id": 1030,
+      "subjectId": 108,
+      "sectionNumber": "B",
+      "facultyUserId": "u_fac_3",
+      "maxSeats": 5,
+      "timeslotMask": 3,
+      "published": 1
+    },
+    {
+      "id": 1031,
+      "subjectId": 108,
+      "sectionNumber": "C",
+      "facultyUserId": "u_fac_2",
+      "maxSeats": 5,
+      "timeslotMask": 3,
       "published": 1
     }
   ],
-
   "enrollments": [
-    { "studentUserId": "u_stu_1", "subjectId": 101 },
-    { "studentUserId": "u_stu_1", "subjectId": 201 },
-
-    { "studentUserId": "u_stu_2", "subjectId": 101 },
-    { "studentUserId": "u_stu_2", "subjectId": 201 },
-
-    { "studentUserId": "u_stu_3", "subjectId": 101 },
-    { "studentUserId": "u_stu_3", "subjectId": 301 },
-
-    { "studentUserId": "u_stu_4", "subjectId": 201 },
-    { "studentUserId": "u_stu_4", "subjectId": 301 }
+    {
+      "studentUserId": "u_stu_1",
+      "subjectId": 106
+    },
+    {
+      "studentUserId": "u_stu_1",
+      "subjectId": 108
+    },
+    {
+      "studentUserId": "u_stu_1",
+      "subjectId": 102
+    },
+    {
+      "studentUserId": "u_stu_1",
+      "subjectId": 103
+    },
+    {
+      "studentUserId": "u_stu_1",
+      "subjectId": 105
+    },
+    {
+      "studentUserId": "u_stu_2",
+      "subjectId": 108
+    },
+    {
+      "studentUserId": "u_stu_2",
+      "subjectId": 101
+    },
+    {
+      "studentUserId": "u_stu_2",
+      "subjectId": 102
+    },
+    {
+      "studentUserId": "u_stu_2",
+      "subjectId": 107
+    },
+    {
+      "studentUserId": "u_stu_3",
+      "subjectId": 101
+    },
+    {
+      "studentUserId": "u_stu_3",
+      "subjectId": 102
+    },
+    {
+      "studentUserId": "u_stu_3",
+      "subjectId": 104
+    },
+    {
+      "studentUserId": "u_stu_3",
+      "subjectId": 103
+    },
+    {
+      "studentUserId": "u_stu_4",
+      "subjectId": 101
+    },
+    {
+      "studentUserId": "u_stu_4",
+      "subjectId": 107
+    },
+    {
+      "studentUserId": "u_stu_4",
+      "subjectId": 102
+    },
+    {
+      "studentUserId": "u_stu_4",
+      "subjectId": 103
+    },
+    {
+      "studentUserId": "u_stu_5",
+      "subjectId": 101
+    },
+    {
+      "studentUserId": "u_stu_5",
+      "subjectId": 102
+    },
+    {
+      "studentUserId": "u_stu_5",
+      "subjectId": 108
+    },
+    {
+      "studentUserId": "u_stu_5",
+      "subjectId": 106
+    },
+    {
+      "studentUserId": "u_stu_5",
+      "subjectId": 105
+    },
+    {
+      "studentUserId": "u_stu_6",
+      "subjectId": 104
+    },
+    {
+      "studentUserId": "u_stu_6",
+      "subjectId": 107
+    },
+    {
+      "studentUserId": "u_stu_6",
+      "subjectId": 101
+    },
+    {
+      "studentUserId": "u_stu_6",
+      "subjectId": 102
+    },
+    {
+      "studentUserId": "u_stu_7",
+      "subjectId": 104
+    },
+    {
+      "studentUserId": "u_stu_7",
+      "subjectId": 103
+    },
+    {
+      "studentUserId": "u_stu_7",
+      "subjectId": 106
+    },
+    {
+      "studentUserId": "u_stu_8",
+      "subjectId": 102
+    },
+    {
+      "studentUserId": "u_stu_8",
+      "subjectId": 106
+    },
+    {
+      "studentUserId": "u_stu_8",
+      "subjectId": 104
+    },
+    {
+      "studentUserId": "u_stu_9",
+      "subjectId": 103
+    },
+    {
+      "studentUserId": "u_stu_9",
+      "subjectId": 106
+    },
+    {
+      "studentUserId": "u_stu_9",
+      "subjectId": 108
+    },
+    {
+      "studentUserId": "u_stu_9",
+      "subjectId": 101
+    },
+    {
+      "studentUserId": "u_stu_9",
+      "subjectId": 104
+    },
+    {
+      "studentUserId": "u_stu_10",
+      "subjectId": 106
+    },
+    {
+      "studentUserId": "u_stu_10",
+      "subjectId": 101
+    },
+    {
+      "studentUserId": "u_stu_10",
+      "subjectId": 107
+    },
+    {
+      "studentUserId": "u_stu_10",
+      "subjectId": 102
+    },
+    {
+      "studentUserId": "u_stu_10",
+      "subjectId": 108
+    }
   ],
-
-  "sectionSelections": [],
-  "_sectionSelections": [
-    { "studentUserId": "u_stu_1", "subjectId": 101, "sectionId": 1001 },
-    { "studentUserId": "u_stu_2", "subjectId": 101, "sectionId": 1002 }
-  ],
-
+  "phaseSchedule": {
+    "selectionStartMs": 1769216274393,
+    "selectionEndMs": 1769237874393,
+    "swapStartMs": 1769237874395,
+    "swapEndMs": 1769252274395
+  },
   "notifications": [
     {
       "createdByUserId": "u_admin_1",
       "audienceRole": null,
       "audienceUserId": null,
-      "title": "Welcome",
-      "body": "Seed completed. Start selection phase soon."
+      "title": "Hello World",
+      "body": "Welcome to the new trimester! Selection phase is now open."
     }
-  ]
+  ],
+  "sectionSelections": [],
+  "_sectionSelections": []
 }

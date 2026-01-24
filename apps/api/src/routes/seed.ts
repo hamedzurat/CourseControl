@@ -21,6 +21,12 @@ import { getDb } from '../lib/db';
 import { runMigrations } from '../lib/migrate';
 import seed from '../seed.json';
 
+const CHUNK_SIZE = 10;
+
+function chunk<T>(arr: T[], size: number): T[][] {
+  return Array.from({ length: Math.ceil(arr.length / size) }, (_, i) => arr.slice(i * size, i * size + size));
+}
+
 export const seedRoute = new Hono<{ Bindings: Env }>();
 
 seedRoute.get('/:secret', async (c) => {
@@ -117,39 +123,60 @@ seedRoute.get('/:secret', async (c) => {
 
   /** Role tables */
   if (Array.isArray(s.admins) && s.admins.length) {
-    await db
-      .insert(adminTable)
-      .values(s.admins.map((a: any) => ({ userId: mapId(String(a.userId)) })))
-      .onConflictDoNothing();
-    summary.upserted.admins = s.admins.length;
+    try {
+      for (const batch of chunk(s.admins, CHUNK_SIZE)) {
+        await db
+          .insert(adminTable)
+          .values(batch.map((a: any) => ({ userId: mapId(String(a.userId)) })))
+          .onConflictDoNothing();
+      }
+      summary.upserted.admins = s.admins.length;
+    } catch (e: any) {
+      console.error('Error seeding admins:', e);
+      throw e;
+    }
   }
 
   if (Array.isArray(s.faculty) && s.faculty.length) {
-    await db
-      .insert(facultyTable)
-      .values(s.faculty.map((f: any) => ({ userId: mapId(String(f.userId)) })))
-      .onConflictDoNothing();
-    summary.upserted.faculty = s.faculty.length;
+    try {
+      for (const batch of chunk(s.faculty, CHUNK_SIZE)) {
+        await db
+          .insert(facultyTable)
+          .values(batch.map((f: any) => ({ userId: mapId(String(f.userId)) })))
+          .onConflictDoNothing();
+      }
+      summary.upserted.faculty = s.faculty.length;
+    } catch (e: any) {
+      console.error('Error seeding faculty:', e);
+      throw e;
+    }
   }
 
   if (Array.isArray(s.students) && s.students.length) {
-    await db
-      .insert(studentTable)
-      .values(
-        s.students.map((st: any) => ({
-          userId: mapId(String(st.userId)),
-          trimesterId: Number(st.trimesterId ?? 0),
-          advisorUserId: st.advisorUserId ? mapId(String(st.advisorUserId)) : null,
-        })),
-      )
-      .onConflictDoUpdate({
-        target: studentTable.userId,
-        set: {
-          trimesterId: studentTable.trimesterId,
-          advisorUserId: studentTable.advisorUserId,
-        } as any,
-      });
-    summary.upserted.students = s.students.length;
+    try {
+      for (const batch of chunk(s.students, CHUNK_SIZE)) {
+        await db
+          .insert(studentTable)
+          .values(
+            batch.map((st: any) => ({
+              userId: mapId(String(st.userId)),
+              trimesterId: Number(st.trimesterId ?? 0),
+              advisorUserId: st.advisorUserId ? mapId(String(st.advisorUserId)) : null,
+            })),
+          )
+          .onConflictDoUpdate({
+            target: studentTable.userId,
+            set: {
+              trimesterId: studentTable.trimesterId,
+              advisorUserId: studentTable.advisorUserId,
+            } as any,
+          });
+      }
+      summary.upserted.students = s.students.length;
+    } catch (e: any) {
+      console.error('Error seeding students:', e);
+      throw e;
+    }
   }
 
   /** Phase schedule */
@@ -167,108 +194,133 @@ seedRoute.get('/:secret', async (c) => {
 
   /** Subjects */
   if (Array.isArray(s.subjects) && s.subjects.length) {
-    await db
-      .insert(subject)
-      .values(
-        s.subjects.map((x: any) => ({
-          id: Number(x.id),
-          code: String(x.code),
-          name: String(x.name),
-          type: String(x.type ?? 'theory'),
-          credits: Number(x.credits),
-          published: x.published == null ? 1 : Number(x.published),
-        })),
-      )
-      .onConflictDoUpdate({
-        target: subject.id,
-        set: {
-          code: subject.code,
-          name: subject.name,
-          type: subject.type,
-          credits: subject.credits,
-          published: subject.published,
-        } as any,
-      });
-    summary.upserted.subjects = s.subjects.length;
+    try {
+      for (const batch of chunk(s.subjects, CHUNK_SIZE)) {
+        await db
+          .insert(subject)
+          .values(
+            batch.map((x: any) => ({
+              id: Number(x.id),
+              code: String(x.code),
+              name: String(x.name),
+              type: String(x.type ?? 'theory'),
+              credits: Number(x.credits),
+              published: x.published == null ? 1 : Number(x.published),
+            })),
+          )
+          .onConflictDoUpdate({
+            target: subject.id,
+            set: {
+              code: subject.code,
+              name: subject.name,
+              type: subject.type,
+              credits: subject.credits,
+              published: subject.published,
+            } as any,
+          });
+      }
+      summary.upserted.subjects = s.subjects.length;
+    } catch (e: any) {
+      console.error('Error seeding subjects:', e);
+      throw e;
+    }
   }
 
   /** Sections */
   if (Array.isArray(s.sections) && s.sections.length) {
-    await db
-      .insert(section)
-      .values(
-        s.sections.map((x: any) => ({
-          id: Number(x.id),
-          subjectId: Number(x.subjectId),
-          sectionNumber: String(x.sectionNumber),
-          facultyUserId: mapId(String(x.facultyUserId)),
-          maxSeats: Number(x.maxSeats),
-          timeslotMask: Number(x.timeslotMask),
-          published: x.published == null ? 1 : Number(x.published),
-        })),
-      )
-      .onConflictDoUpdate({
-        target: section.id,
-        set: {
-          subjectId: section.subjectId,
-          sectionNumber: section.sectionNumber,
-          facultyUserId: section.facultyUserId,
-          maxSeats: section.maxSeats,
-          timeslotMask: section.timeslotMask,
-          published: section.published,
-        } as any,
-      });
-    summary.upserted.sections = s.sections.length;
+    try {
+      for (const batch of chunk(s.sections, CHUNK_SIZE)) {
+        await db
+          .insert(section)
+          .values(
+            batch.map((x: any) => ({
+              id: Number(x.id),
+              subjectId: Number(x.subjectId),
+              sectionNumber: String(x.sectionNumber),
+              facultyUserId: mapId(String(x.facultyUserId)),
+              maxSeats: Number(x.maxSeats),
+              timeslotMask: Number(x.timeslotMask),
+              published: x.published == null ? 1 : Number(x.published),
+            })),
+          )
+          .onConflictDoUpdate({
+            target: section.id,
+            set: {
+              subjectId: section.subjectId,
+              sectionNumber: section.sectionNumber,
+              facultyUserId: section.facultyUserId,
+              maxSeats: section.maxSeats,
+              timeslotMask: section.timeslotMask,
+              published: section.published,
+            } as any,
+          });
+      }
+      summary.upserted.sections = s.sections.length;
+    } catch (e: any) {
+      console.error('Error seeding sections:', e);
+      throw e;
+    }
   }
 
   /** Enrollments */
   if (Array.isArray(s.enrollments) && s.enrollments.length) {
-    await db
-      .insert(enrollment)
-      .values(
-        s.enrollments.map((x: any) => ({
-          studentUserId: mapId(String(x.studentUserId)),
-          subjectId: Number(x.subjectId),
-        })),
-      )
-      .onConflictDoNothing();
-    summary.upserted.enrollments = s.enrollments.length;
+    try {
+      for (const batch of chunk(s.enrollments, CHUNK_SIZE)) {
+        await db
+          .insert(enrollment)
+          .values(
+            batch.map((x: any) => ({
+              studentUserId: mapId(String(x.studentUserId)),
+              subjectId: Number(x.subjectId),
+            })),
+          )
+          .onConflictDoNothing();
+      }
+      summary.upserted.enrollments = s.enrollments.length;
+    } catch (e: any) {
+      console.error('Error seeding enrollments:', e);
+      throw e;
+    }
   }
 
   /** Initial Selections */
   if (Array.isArray(s.sectionSelections) && s.sectionSelections.length) {
-    await db
-      .insert(sectionSelection)
-      .values(
-        s.sectionSelections.map((x: any) => ({
-          studentUserId: mapId(String(x.studentUserId)),
-          subjectId: Number(x.subjectId),
-          sectionId: Number(x.sectionId),
-          selectedAtMs: Number(x.selectedAtMs ?? Date.now()),
-        })),
-      )
-      .onConflictDoUpdate({
-        target: [sectionSelection.studentUserId, sectionSelection.subjectId],
-        set: {
-          sectionId: sectionSelection.sectionId,
-          selectedAtMs: sectionSelection.selectedAtMs,
-        } as any,
-      });
+    for (const batch of chunk(s.sectionSelections, CHUNK_SIZE)) {
+      await db
+        .insert(sectionSelection)
+        .values(
+          batch.map((x: any) => ({
+            studentUserId: mapId(String(x.studentUserId)),
+            subjectId: Number(x.subjectId),
+            sectionId: Number(x.sectionId),
+            selectedAtMs: Number(x.selectedAtMs ?? Date.now()),
+          })),
+        )
+        .onConflictDoUpdate({
+          target: [sectionSelection.studentUserId, sectionSelection.subjectId],
+          set: {
+            sectionId: sectionSelection.sectionId,
+            selectedAtMs: sectionSelection.selectedAtMs,
+          } as any,
+        });
+    }
     summary.upserted.sectionSelections = s.sectionSelections.length;
   }
 
   // ---- optional notifications ----
   if (Array.isArray(s.notifications) && s.notifications.length) {
-    await db.insert(notificationTable).values(
-      s.notifications.map((n: any) => ({
-        createdByUserId: mapId(String(n.createdByUserId ?? 'system')),
-        audienceRole: n.audienceRole ? String(n.audienceRole) : null,
-        audienceUserId: n.audienceUserId ? mapId(String(n.audienceUserId)) : null,
-        title: String(n.title),
-        body: String(n.body),
-        createdAtMs: Number(n.createdAtMs ?? Date.now()),
-      })),
-    );
+    for (const batch of chunk(s.notifications, CHUNK_SIZE)) {
+      await db.insert(notificationTable).values(
+        batch.map((n: any) => ({
+          createdByUserId: mapId(String(n.createdByUserId ?? 'system')),
+          audienceRole: n.audienceRole ? String(n.audienceRole) : null,
+          audienceUserId: n.audienceUserId ? mapId(String(n.audienceUserId)) : null,
+          title: String(n.title),
+          body: String(n.body),
+          createdAtMs: Number(n.createdAtMs ?? Date.now()),
+        })),
+      );
+    }
     summary.upserted.notifications = s.notifications.length;
   }
 
