@@ -4,6 +4,7 @@
   import { Input } from '$lib/components/ui/input';
   import { ScrollArea } from '$lib/components/ui/scroll-area';
   import { Separator } from '$lib/components/ui/separator';
+  import { authStore } from '$lib/stores/auth';
   import { chatActiveMessages, chatActivePeerId, chatAddOut, chatOpen, chatPeersSorted } from '$lib/stores/chat';
   import { meStore } from '$lib/stores/me';
   import { userWsSend } from '$lib/ws/user-ws';
@@ -15,10 +16,63 @@
 
   const activePeer = $derived($chatActivePeerId || '');
 
-  function startPeer() {
-    const id = peerInput.trim();
-    if (!id) return;
-    chatOpen(id);
+  let userCache = $state<Record<string, { email: string; name: string }>>({});
+
+  $effect(() => {
+    const peers = $chatPeersSorted;
+    const token = authStore.get()?.token;
+    if (!token || !peers.length) return;
+
+    const missing = peers.filter((id) => !userCache[id]);
+    if (missing.length === 0) return;
+
+    // batch resolve
+    fetch('http://localhost:8787/user/resolve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ userIds: missing }),
+    }).then(async (r) => {
+      if (r.ok) {
+        const users = await r.json();
+        const update: Record<string, any> = {};
+        for (const u of users) {
+          update[u.id] = { email: u.email, name: u.name };
+        }
+        userCache = { ...userCache, ...update };
+      }
+    });
+  });
+
+  async function startPeer() {
+    const input = peerInput.trim();
+    if (!input) return;
+
+    let targetId = input;
+
+    // Check if email
+    if (input.includes('@')) {
+      try {
+        const token = authStore.get()?.token;
+        const res = await fetch(`http://localhost:8787/user/lookup?email=${encodeURIComponent(input)}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        if (!res.ok) {
+          alert('User not found by email');
+          return;
+        }
+        const user = await res.json();
+        targetId = user.id;
+        userCache = { ...userCache, [user.id]: { email: user.email, name: user.name } };
+      } catch (e) {
+        console.error(e);
+        alert('Failed to lookup user');
+        return;
+      }
+    }
+
+    chatOpen(targetId);
     peerInput = '';
   }
 
@@ -62,39 +116,45 @@
       return '';
     }
   }
+
+  function resolveName(id: string) {
+    return userCache[id]?.email ?? id;
+  }
 </script>
 
-<div class="mx-auto w-full max-w-6xl space-y-4 p-6">
-  <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-    <div class="space-y-1">
-      <div class="text-2xl font-semibold">Chat</div>
-      <div class="text-sm text-muted-foreground">Start by typing a userId.</div>
+<div class="flex h-[calc(100vh-4rem)] w-full flex-col p-4 md:p-6">
+  <div class="mx-auto flex h-full w-full max-w-7xl flex-col gap-4">
+    <div class="flex flex-shrink-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div class="space-y-1">
+        <div class="text-2xl font-semibold">Chat</div>
+        <div class="text-sm text-muted-foreground">Start by typing an email or userId.</div>
+      </div>
+      <div class="text-xs text-muted-foreground">
+        {me?.user?.id} • {me?.user?.role}
+      </div>
     </div>
-    <div class="text-xs text-muted-foreground">
-      {me?.user?.id} • {me?.user?.role}
-    </div>
-  </div>
 
-  <div class="grid gap-4 lg:grid-cols-[320px_1fr]">
-    <!-- Left: peers -->
-    <Card class="p-3">
-      <div class="space-y-3">
-        <div class="text-sm font-medium">Open chat</div>
+    <div class="grid flex-1 gap-4 overflow-hidden lg:grid-cols-[320px_1fr]">
+      <!-- Left: peers -->
+      <Card class="flex h-full flex-col p-3">
+        <div class="flex flex-shrink-0 flex-col gap-3 pb-3">
+          <div class="text-sm font-medium">Open chat</div>
 
-        <div class="flex gap-2">
-          <Input
-            placeholder="userId (e.g. u_stu_1)"
-            bind:value={peerInput}
-            onkeydown={(e: KeyboardEvent) => e.key === 'Enter' && startPeer()}
-          />
-          <Button onclick={startPeer}>Open</Button>
+          <div class="flex gap-2">
+            <Input
+              placeholder="email (fac1@uiu.bd)"
+              bind:value={peerInput}
+              onkeydown={(e: KeyboardEvent) => e.key === 'Enter' && startPeer()}
+            />
+            <Button onclick={startPeer}>Open</Button>
+          </div>
+
+          <Separator />
+
+          <div class="text-sm font-medium">Recent</div>
         </div>
 
-        <Separator />
-
-        <div class="text-sm font-medium">Recent</div>
-
-        <ScrollArea class="h-[420px] pr-2">
+        <ScrollArea class="flex-1 pr-2">
           <div class="space-y-1">
             {#if $chatPeersSorted.length === 0}
               <div class="py-2 text-sm text-muted-foreground">No chats yet.</div>
@@ -105,32 +165,37 @@
                   class:font-semibold={peerId === $chatActivePeerId}
                   onclick={() => chatOpen(peerId)}
                 >
-                  <div class="truncate">{peerId}</div>
+                  <div class="truncate text-sm">{resolveName(peerId)}</div>
+                  {#if !userCache[peerId]}<div class="truncate text-xs text-muted-foreground opacity-50">
+                      {peerId}
+                    </div>{/if}
                 </button>
               {/each}
             {/if}
           </div>
         </ScrollArea>
-      </div>
-    </Card>
+      </Card>
 
-    <!-- Right: conversation -->
-    <Card class="p-3">
-      <div class="space-y-3">
-        <div class="text-sm font-medium">
-          {#if activePeer}
-            Conversation: <span class="font-semibold">{activePeer}</span>
-          {:else}
-            Pick a conversation
-          {/if}
+      <!-- Right: conversation -->
+      <Card class="flex h-full flex-col p-3">
+        <div class="flex flex-shrink-0 flex-col gap-3 pb-3">
+          <div class="text-sm font-medium">
+            {#if activePeer}
+              Conversation: <span class="font-semibold">{resolveName(activePeer)}</span>
+            {:else}
+              Pick a conversation
+            {/if}
+          </div>
+
+          <Separator />
         </div>
 
-        <Separator />
-
-        <ScrollArea class="h-[420px] pr-2">
+        <ScrollArea class="flex-1 pr-2">
           <div class="space-y-3">
             {#if !activePeer}
-              <div class="py-2 text-sm text-muted-foreground">Open a chat from the left.</div>
+              <div class="flex h-full items-center justify-center text-sm text-muted-foreground">
+                Select a conversation from the left to start chatting.
+              </div>
             {:else if $chatActiveMessages.length === 0}
               <div class="py-2 text-sm text-muted-foreground">No messages yet.</div>
             {:else}
@@ -139,7 +204,7 @@
                   <div class="flex items-center justify-between gap-3">
                     <div class="text-xs text-muted-foreground">
                       {m.dir === 'out' ? 'You →' : '← Them'}
-                      {m.peerUserId}
+                      {resolveName(m.peerUserId)}
                     </div>
                     <div class="text-xs text-muted-foreground">{fmt(m.atMs)}</div>
                   </div>
@@ -153,20 +218,20 @@
           </div>
         </ScrollArea>
 
-        <Separator />
-
-        <div class="flex gap-2">
-          <Input
-            placeholder={activePeer ? 'Type a message…' : 'Open a chat first…'}
-            bind:value={draft}
-            disabled={!activePeer}
-            onkeydown={onDraftKeydown}
-          />
-          <Button disabled={!activePeer || !draft.trim()} onclick={send}>Send</Button>
+        <div class="flex flex-shrink-0 flex-col gap-3 pt-3">
+          <Separator />
+          <div class="flex gap-2">
+            <Input
+              placeholder={activePeer ? 'Type a message…' : 'Open a chat first…'}
+              bind:value={draft}
+              disabled={!activePeer}
+              onkeydown={onDraftKeydown}
+            />
+            <Button disabled={!activePeer || !draft.trim()} onclick={send}>Send</Button>
+          </div>
+          <div class="text-xs text-muted-foreground">Enter = send • Shift+Enter = newline</div>
         </div>
-
-        <div class="text-xs text-muted-foreground">Enter = send • Shift+Enter = newline</div>
-      </div>
-    </Card>
+      </Card>
+    </div>
   </div>
 </div>

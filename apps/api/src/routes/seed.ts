@@ -96,9 +96,28 @@ seedRoute.get('/:secret', async (c) => {
             // Update role/verification since Better Auth creates as default/unverified usually
             await db.update(baUser).set({ role, emailVerified: true }).where(eq(baUser.id, realId));
           }
-        } catch (e) {
-          console.error(`Failed to seed user ${email}:`, e);
-          continue; // Skip if failed
+        } catch (e: any) {
+          console.error(`Failed to seed user ${email}:`, e?.message || e);
+          // Fallback: insert manually so referential integrity holds
+          try {
+            await db
+              .insert(baUser)
+              .values({
+                id: targetId,
+                name,
+                email,
+                role,
+                emailVerified: true,
+                image: u.image ? String(u.image) : undefined,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              })
+              .onConflictDoNothing();
+            realId = targetId;
+          } catch (e2) {
+            console.error('Fallback insert failed', e2);
+            continue;
+          }
         }
       } else {
         realId = existing[0].id;

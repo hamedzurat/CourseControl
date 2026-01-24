@@ -9,8 +9,12 @@ export const requireJwt: MiddlewareHandler<{ Bindings: Env; Variables: { jwtUser
   if (c.req.method === 'OPTIONS') {
     return next();
   }
-  const user = await verifyJwtFromRequest(c.env, c.req.raw);
-  c.set('jwtUser', user);
+  try {
+    const user = await verifyJwtFromRequest(c.env, c.req.raw);
+    c.set('jwtUser', user);
+  } catch (e: any) {
+    return c.json({ error: 'UNAUTHORIZED', message: e?.message || 'Unauthorized' }, 401);
+  }
   await next();
 };
 

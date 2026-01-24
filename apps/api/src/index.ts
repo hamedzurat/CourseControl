@@ -15,6 +15,7 @@ import { phaseRoute } from './routes/phase';
 import { relationRoute } from './routes/relation';
 import { seedRoute } from './routes/seed';
 import { stateRoute } from './routes/state';
+import { userRoute } from './routes/user';
 
 type JwtUser = { id: string; email: string; role: Role };
 
@@ -55,6 +56,7 @@ app.use('*', requireJwt);
 
 app.route('/me', meRoute);
 app.route('/phase', phaseRoute);
+app.route('/user', userRoute);
 
 // admin db debug
 app.use('/admin/db', requireRole(['admin']));
