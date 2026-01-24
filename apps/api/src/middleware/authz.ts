@@ -6,6 +6,9 @@ import { verifyJwtFromRequest } from '../lib/auth';
 type JwtUser = { id: string; email: string; role: Role };
 
 export const requireJwt: MiddlewareHandler<{ Bindings: Env; Variables: { jwtUser: JwtUser } }> = async (c, next) => {
+  if (c.req.method === 'OPTIONS') {
+    return next();
+  }
   const user = await verifyJwtFromRequest(c.env, c.req.raw);
   c.set('jwtUser', user);
   await next();

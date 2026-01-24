@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { cors } from 'hono/cors';
 
 import type { Env, Role } from './env';
 import { authHandler } from './lib/auth';
@@ -21,6 +22,18 @@ const app = new Hono<{
   Bindings: Env;
   Variables: { jwtUser: JwtUser };
 }>();
+
+app.use(
+  '*',
+  cors({
+    origin: ['http://localhost:5173', 'http://localhost:8787'],
+    allowHeaders: ['Content-Type', 'Authorization', 'Upgrade-Insecure-Requests'],
+    allowMethods: ['POST', 'GET', 'OPTIONS'],
+    exposeHeaders: ['Content-Length', 'X-Kuma-Revision'],
+    maxAge: 600,
+    credentials: true,
+  }),
+);
 
 app.get('/health', (c) => c.json({ ok: true }));
 
