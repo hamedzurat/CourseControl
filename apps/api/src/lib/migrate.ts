@@ -82,11 +82,15 @@ export async function runMigrations(env: Env) {
   stmts.push(`
     CREATE TABLE IF NOT EXISTS jwks (
       id TEXT PRIMARY KEY NOT NULL,
-      kid TEXT NOT NULL,
-      key TEXT NOT NULL,
+      kid TEXT,
+      publicKey TEXT NOT NULL,
+      privateKey TEXT NOT NULL,
       createdAt INTEGER NOT NULL
     );
   `);
+  // Migration: add new columns if table exists with old schema
+  stmts.push(`ALTER TABLE jwks ADD COLUMN publicKey TEXT;`);
+  stmts.push(`ALTER TABLE jwks ADD COLUMN privateKey TEXT;`);
   stmts.push(`CREATE UNIQUE INDEX IF NOT EXISTS jwks_kid_ux ON jwks(kid);`);
 
   // Role profile tables

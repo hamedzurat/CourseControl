@@ -3,8 +3,8 @@
 
   import { goto } from '$app/navigation';
 
-  import { apiFetch } from '$lib/api/fetch';
-  import { authClient } from '$lib/auth-client';
+  import { apiFetch } from '$lib/api';
+  import { authClient } from '$lib/auth';
   import ModeToggle from '$lib/components/ModeToggle.svelte';
   import { Button } from '$lib/components/ui/button';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
@@ -73,7 +73,7 @@
       // Better Auth one-time token plugin
       const res: any = await authClient.oneTimeToken.generate();
       // most implementations return { token } (and sometimes { expiresAt })
-      ott = String(res?.token ?? '');
+      ott = String(res?.data?.token ?? '');
       if (!ott) throw new Error('No token returned');
     } catch (e: any) {
       ottError = e?.message ?? 'Failed to generate token';

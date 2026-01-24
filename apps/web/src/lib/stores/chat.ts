@@ -70,7 +70,8 @@ export function chatOnServerMessage(msg: any, myUserId: string) {
   if (!from || !to || !text) return;
 
   const peer = from === myUserId ? to : from;
-  const dir: 'in' | 'out' = from === myUserId ? 'out' : 'in';
+  if (from === myUserId) return; // ignore my own echo (optimistic UI)
+  const dir: 'in' | 'out' = 'in';
 
   push(peer, {
     id: crypto.randomUUID(),

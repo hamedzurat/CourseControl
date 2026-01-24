@@ -26,7 +26,7 @@
   import { Dialog as SheetPrimitive } from 'bits-ui';
   import type { ComponentProps, Snippet } from 'svelte';
 
-  import { cn, type WithoutChildrenOrChild } from '$lib/utils.js';
+  import { cn, type WithoutChildrenOrChild } from '$lib/utils';
 
   import SheetOverlay from './sheet-overlay.svelte';
   import SheetPortal from './sheet-portal.svelte';

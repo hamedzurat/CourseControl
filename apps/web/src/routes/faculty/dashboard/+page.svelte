@@ -1,210 +1,168 @@
 <script lang="ts">
+  import { BookOpen, ChevronDown, ChevronUp, Users } from '@lucide/svelte';
   import { onMount } from 'svelte';
 
+  import { apiFetch } from '$lib/api';
+  import { Avatar, AvatarFallback, AvatarImage } from '$lib/components/ui/avatar';
+  import { Badge } from '$lib/components/ui/badge';
   import { Button } from '$lib/components/ui/button';
-  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
-  import * as Table from '$lib/components/ui/table/index.js';
-  import { loadMe, meStore } from '$lib/stores/me';
-  import { loadRelation, relationStore } from '$lib/stores/relation';
+  import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '$lib/components/ui/collapsible';
   import { facultyStatus, seatStatus } from '$lib/stores/ws';
-  import { ensureUserWsConnected } from '$lib/ws/user-ws';
+  import { formatTimeslot } from '$lib/utils/timeslot';
 
-  // --- State ---
-  // Use derived signals for Svelte 5 reactivity
-  const fStatus = $derived($facultyStatus);
-  const relation = $derived($relationStore);
-  const seats = $derived($seatStatus); // Live seat map from WS
-  const me = $derived($meStore);
+  let status = $derived($facultyStatus);
+  let seats = $derived($seatStatus);
 
-  let loading = $state(false);
-  let error = $state<string | null>(null);
+  let subjects = $derived(status?.subjects ?? []);
+  let taughtSectionIds = $derived<number[]>(status?.taughtSectionIds ?? []);
 
-  // --- Helpers ---
+  // Local state for expanded rosters
+  let expandedRows = $state<Record<number, boolean>>({});
+  let rosters = $state<Record<number, { studentUserId: string; joinedAtMs: number; name?: string }[]>>({});
+  let loadingRoster = $state<Record<number, boolean>>({});
 
-  /** * Finds Subject and Section details from relation.json
-   * relation = { subjects: [ { sections: [...] } ] }
-   */
-  function getSectionDetail(sectionId: number) {
-    if (!relation?.subjects) return null;
+  function toggleRow(sectionId: number) {
+    const next = !expandedRows[sectionId];
+    expandedRows[sectionId] = next;
+    if (next && !rosters[sectionId]) {
+      loadRoster(sectionId);
+    }
+  }
 
-    for (const subj of relation.subjects) {
-      const sec = subj.sections.find((s: any) => Number(s.id) === Number(sectionId));
-      if (sec) {
-        return { subject: subj, section: sec };
-      }
+  async function loadRoster(sectionId: number) {
+    loadingRoster[sectionId] = true;
+    try {
+      // Hit the SectionDO via the HTTP proxy
+      const res = await apiFetch<any>(`/actor/section?id=${sectionId}&method=GET&path=/status`);
+      rosters[sectionId] = res.members ?? [];
+    } catch (e) {
+      console.error(e);
+    } finally {
+      loadingRoster[sectionId] = false;
+    }
+  }
+
+  // Derive display list
+  // We need to map subjects -> sections and filter by `taughtSectionIds`.
+  // The `seats` store has the latest `maxSeats` and `seatsLeft`.
+  // `subjects` from `status` has static metadata (code, name).
+
+  // Actually, facultyStatus.subjects contains the metadata for subjects the faculty teaches.
+  // We can iterate that.
+
+  function getSectionInfo(subjectId: number, sectionId: number) {
+    // Try to find live data first
+    const subjectData = seats[subjectId];
+    const sectionLive = subjectData?.sections?.[sectionId];
+
+    if (sectionLive) {
+      return {
+        // So `seats` in `seatStatus` is seatsLeft.
+        seatsLeft: sectionLive.seats,
+        maxSeats: sectionLive.maxSeats,
+      };
     }
     return null;
   }
-
-  /**
-   * Finds Live Seat Count from WebSocket Store
-   * seats = { "101": { sections: { "1011": { seats: 1, ... } } } }
-   */
-  function getSeatInfo(subjectId: number, sectionId: number) {
-    if (!seats) return null;
-
-    // 1. Find the subject object in the seat map
-    const subjectData = seats[String(subjectId)] || seats[subjectId];
-    if (!subjectData?.sections) return null;
-
-    // 2. Find the specific section
-    const secData = subjectData.sections[String(sectionId)] || subjectData.sections[sectionId];
-    return secData;
-  }
-
-  // --- Derived List ---
-  const taughtSectionRows = $derived.by(() => {
-    // We treat this as number[] to satisfy TS
-    const ids = (fStatus?.taughtSectionIds ?? []) as number[];
-
-    // FIX: Added explicit type (id: number)
-    return ids
-      .map((id: number) => {
-        const detail = getSectionDetail(id);
-        if (!detail) return null;
-
-        const seatInfo = getSeatInfo(detail.subject.id, id);
-
-        return {
-          id,
-          subjectCode: detail.subject.code,
-          sectionNumber: detail.section.sectionNumber,
-          timeslotMask: detail.section.timeslotMask,
-          seatsLeft: seatInfo?.seats ?? '—',
-          maxSeats: seatInfo?.maxSeats ?? detail.section.maxSeats ?? '—',
-        };
-      })
-      .filter(Boolean);
-  });
-
-  // --- Lifecycle ---
-  async function bootstrap() {
-    loading = true;
-    error = null;
-    try {
-      ensureUserWsConnected();
-      await Promise.all([loadRelation(), loadMe()]);
-    } catch (e: any) {
-      error = e?.message ?? 'Failed to load data';
-    } finally {
-      loading = false;
-    }
-  }
-
-  function refresh() {
-    // Re-connect WS to force a status push
-    ensureUserWsConnected();
-    loadRelation(); // Refresh static data
-  }
-
-  onMount(() => {
-    bootstrap();
-  });
 </script>
 
-<div class="mx-auto w-full max-w-5xl space-y-6 p-6">
-  <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-    <div class="space-y-1">
-      <h1 class="text-2xl font-semibold">Faculty dashboard</h1>
-      {#if fStatus?.faculty}
-        <div class="text-sm text-muted-foreground">
-          <span class="font-medium text-foreground">{fStatus.faculty.name}</span>
-          <span class="mx-1">·</span>
-          {fStatus.faculty.email}
-        </div>
-      {:else if me?.user}
-        <p class="text-sm text-muted-foreground">{me.user.email} (Loading details...)</p>
-      {:else}
-        <p class="text-sm text-muted-foreground">Connecting...</p>
-      {/if}
-    </div>
-
-    <div class="flex gap-2">
-      <Button variant="outline" onclick={refresh} disabled={loading}>
-        {loading ? 'Refreshing...' : 'Refresh Data'}
-      </Button>
-    </div>
+<div class="space-y-6">
+  <div>
+    <h1 class="text-3xl font-bold tracking-tight">Faculty Dashboard</h1>
+    <p class="text-muted-foreground">Manage your sections and view real-time enrollment.</p>
   </div>
 
-  {#if error}
+  {#if subjects.length === 0}
     <Card>
       <CardContent class="pt-6">
-        <div class="text-sm text-destructive">{error}</div>
+        <p class="text-sm text-muted-foreground">You are not assigned to any sections yet.</p>
       </CardContent>
     </Card>
   {/if}
 
-  <Card>
-    <CardHeader class="space-y-2">
-      <CardTitle>My taught sections</CardTitle>
-      <div class="text-xs text-muted-foreground">Live seat updates from WebSocket</div>
-    </CardHeader>
+  <div class="grid gap-6">
+    {#each subjects as sub (sub.id)}
+      <!-- We don't have the section list in `sub` directly from `facultyStatus`? 
+            Let's check `faculty.ts`. 
+            `buildFacultyInfo` returns `subjects` array (id, code, name).
+            It does NOT return the list of sections per subject.
+            BUT `seatStatus` (KV) has the list of sections for each subject.
+            So we iterate `seats[sub.id].sections` filtering by `taughtSectionIds`.
+        -->
+      {@const subjectLive = seats[sub.id]}
+      <!-- Fix spread type error by casting v to any -->
+      {@const relevantSections = Object.entries(subjectLive?.sections ?? {})
+        .map(([k, v]) => ({ id: Number(k), ...(v as any) }))
+        .filter((s) => taughtSectionIds.includes(s.id))
+        .sort((a, b) => a.id - b.id)}
 
-    <CardContent>
-      {#if !fStatus}
-        <div class="py-4 text-sm text-muted-foreground">
-          Waiting for status... If this takes too long, try refreshing.
-        </div>
-      {:else if taughtSectionRows.length === 0}
-        <div class="py-4 text-sm text-muted-foreground">
-          You are not assigned to any sections in the current relation data.
-        </div>
-      {:else}
-        <div class="overflow-x-auto">
-          <Table.Table class="min-w-[800px]">
-            <Table.TableHeader>
-              <Table.TableRow>
-                <Table.TableHead>Subject</Table.TableHead>
-                <Table.TableHead>Section</Table.TableHead>
-                <Table.TableHead>Timeslot</Table.TableHead>
-                <Table.TableHead>Seats</Table.TableHead>
-                <Table.TableHead class="text-right">Section ID</Table.TableHead>
-              </Table.TableRow>
-            </Table.TableHeader>
+      {#if relevantSections.length > 0}
+        <Card>
+          <CardHeader>
+            <CardTitle>{sub.code}: {sub.name}</CardTitle>
+            <CardDescription>{relevantSections.length} section(s) assigned</CardDescription>
+          </CardHeader>
+          <CardContent class="grid gap-4">
+            {#each relevantSections as sec (sec.id)}
+              {@const info = getSectionInfo(sub.id, sec.id)}
+              {@const isOpen = expandedRows[sec.id]}
 
-            <Table.TableBody>
-              {#each taughtSectionRows as row (row?.id)}
-                <Table.TableRow>
-                  <Table.TableCell class="font-medium">
-                    {row?.subjectCode}
-                  </Table.TableCell>
-                  <Table.TableCell>
-                    {row?.sectionNumber}
-                  </Table.TableCell>
-                  <Table.TableCell class="font-mono text-sm text-muted-foreground">
-                    {row?.timeslotMask ?? '—'}
-                  </Table.TableCell>
-                  <Table.TableCell>
-                    <span class="font-medium">{row?.seatsLeft}</span>
-                    <span class="text-muted-foreground"> / {row?.maxSeats}</span>
-                  </Table.TableCell>
-                  <Table.TableCell class="text-right font-mono text-xs">
-                    {row?.id}
-                  </Table.TableCell>
-                </Table.TableRow>
-              {/each}
-            </Table.TableBody>
-          </Table.Table>
-        </div>
+              <div class="rounded-lg border p-4">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <div class="text-lg font-semibold">Section {sec.id}</div>
+                    <div class="text-sm text-muted-foreground">
+                      <!-- If we had timeslot in KV, we'd show it. currently KV payload might not have it. Start simple. -->
+                      Enrolled:
+                      <span class="font-medium text-foreground">
+                        {sec.maxSeats - sec.seats} / {sec.maxSeats}
+                      </span>
+                    </div>
+                  </div>
+
+                  <Button variant="ghost" size="sm" onclick={() => toggleRow(sec.id)}>
+                    {#if isOpen}
+                      <ChevronUp class="mr-2 h-4 w-4" /> Hide Roster
+                    {:else}
+                      <ChevronDown class="mr-2 h-4 w-4" /> View Roster
+                    {/if}
+                  </Button>
+                </div>
+
+                {#if isOpen}
+                  <div class="mt-4 border-t pt-4">
+                    {#if loadingRoster[sec.id]}
+                      <div class="text-sm text-muted-foreground">Loading roster...</div>
+                    {:else if rosters[sec.id]?.length === 0}
+                      <div class="text-sm text-muted-foreground">No students enrolled.</div>
+                    {:else}
+                      <div class="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+                        {#each rosters[sec.id] as student}
+                          <div class="flex items-center gap-2 rounded-md border p-2">
+                            <Avatar class="h-8 w-8">
+                              <AvatarImage
+                                src={`https://api.dicebear.com/9.x/thumbs/svg?seed=${student.studentUserId}`}
+                              />
+                              <AvatarFallback>ST</AvatarFallback>
+                            </Avatar>
+                            <div class="overflow-hidden">
+                              <div class="truncate text-sm font-medium">{student.name || student.studentUserId}</div>
+                              <div class="text-xs text-muted-foreground">
+                                Joined {new Date(student.joinedAtMs).toLocaleTimeString()}
+                              </div>
+                            </div>
+                          </div>
+                        {/each}
+                      </div>
+                    {/if}
+                  </div>
+                {/if}
+              </div>
+            {/each}
+          </CardContent>
+        </Card>
       {/if}
-    </CardContent>
-  </Card>
-
-  {#if fStatus?.subjects?.length}
-    <Card>
-      <CardHeader>
-        <CardTitle>My subjects</CardTitle>
-      </CardHeader>
-      <CardContent class="space-y-2">
-        <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {#each fStatus.subjects as sub (sub.id)}
-            <div class="flex flex-col justify-center rounded-xl border p-4">
-              <div class="font-medium">{sub.code}</div>
-              <div class="truncate text-sm text-muted-foreground" title={sub.name}>{sub.name}</div>
-            </div>
-          {/each}
-        </div>
-      </CardContent>
-    </Card>
-  {/if}
+    {/each}
+  </div>
 </div>

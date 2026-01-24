@@ -85,7 +85,7 @@
           <Input
             placeholder="userId (e.g. u_stu_1)"
             bind:value={peerInput}
-            onkeydown={(e) => e.key === 'Enter' && startPeer()}
+            onkeydown={(e: KeyboardEvent) => e.key === 'Enter' && startPeer()}
           />
           <Button onclick={startPeer}>Open</Button>
         </div>

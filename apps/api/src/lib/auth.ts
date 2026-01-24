@@ -2,6 +2,7 @@ import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { bearer, captcha, jwt, multiSession } from 'better-auth/plugins';
 import { oneTimeToken } from 'better-auth/plugins/one-time-token';
+import { nanoid } from 'nanoid';
 
 import * as schema from '../db/schema';
 import type { Env, Role } from '../env';
@@ -52,7 +53,9 @@ export function getAuth(env: Env) {
     // JWT + JWKS endpoints for Better Auth (separate from our app JWT)
     jwt(),
     // One-time token plugin
-    oneTimeToken(),
+    oneTimeToken({
+      generateToken: async () => nanoid(12),
+    }),
     multiSession(),
   ];
 
@@ -68,17 +71,29 @@ export function getAuth(env: Env) {
   const auth = betterAuth({
     baseURL: env.BETTER_AUTH_BASE_URL,
     basePath: '/auth',
+    trustedOrigins: ['http://localhost:5173', 'http://localhost:8787'],
 
     database: drizzleAdapter(db, {
       provider: 'sqlite',
       schema: {
-        ...schema,
         user: schema.baUser,
+        session: schema.session,
+        account: schema.account,
+        verification: schema.verification,
+        jwks: schema.jwks,
       },
     }),
 
     emailAndPassword: {
       enabled: true,
+    },
+
+    user: {
+      additionalFields: {
+        role: {
+          type: 'string',
+        },
+      },
     },
 
     socialProviders:
@@ -103,8 +118,13 @@ export function authHandler(env: Env, req: Request) {
 }
 
 export async function getBetterAuthSession(env: Env, req: Request) {
-  // Better Auth server-side session lookup expects headers
-  return getAuth(env).api.getSession({ headers: req.headers as any });
+  try {
+    return await getAuth(env).api.getSession({ headers: req.headers as any });
+  } catch (e) {
+    // Better Auth may throw if session lookup fails
+    console.error('getBetterAuthSession error:', e);
+    return null;
+  }
 }
 
 /**

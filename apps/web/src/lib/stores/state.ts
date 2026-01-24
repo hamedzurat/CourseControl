@@ -1,6 +1,6 @@
 import { persistentAtom } from '@nanostores/persistent';
 
-import { apiFetch } from '$lib/api/fetch';
+import { apiFetch } from '$lib/api';
 
 export type StatePayload = any;
 

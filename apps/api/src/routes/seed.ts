@@ -79,6 +79,7 @@ seedRoute.get('/:secret', async (c) => {
               email,
               password,
               name,
+              role,
               image: u.image ? String(u.image) : undefined,
             },
             asResponse: false,
@@ -103,7 +104,7 @@ seedRoute.get('/:secret', async (c) => {
             role,
             emailVerified: true,
             image: u.image ? String(u.image) : baUser.image,
-            updatedAt: new Date().toISOString() as any, // Cast for Drizzle strict mode if needed, or number
+            updatedAt: new Date(),
           })
           .where(eq(baUser.email, email));
       }

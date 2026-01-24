@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
 
-  import { apiFetch } from '$lib/api/fetch';
+  import { apiFetch } from '$lib/api';
+  import QueuePanel from '$lib/components/QueuePanel.svelte';
   import { Badge } from '$lib/components/ui/badge';
   import { Button } from '$lib/components/ui/button';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
@@ -169,7 +170,7 @@
     const mask = section.timeslotMask ?? 0;
     if (!mask) return false;
     for (const s of selectedSections) {
-      if (s.subjectId === subjectId) continue; // Same subject is not a conflict (it's a change)
+      if (s.subjectId === subjectId) continue;
       if ((mask & s.mask) !== 0) return true;
     }
     return false;
@@ -235,7 +236,6 @@
     const sectionId = Number(sec.id);
     const g = groupForSubject(subjectId);
 
-    // 1. Queue Status (Highest Priority for Feedback)
     const q = queueForSection(sectionId) ?? queueForSubject(subjectId);
     if (q && (q.status === 'queued' || q.status === 'running')) {
       return q.status === 'running'
@@ -243,41 +243,32 @@
         : { state: 'in_queue', reason: 'Action queued...', icon: '⏳' };
     }
 
-    // 2. Selection Status (High Priority: User needs to know what they HAVE)
     const selId = selectedBySubject.get(subjectId);
     const isSelected = selId === sectionId;
 
     if (isSelected) {
-      // Even if group locked, if I have it, show Selected (Green)
       return { state: 'selected', reason: 'You are enrolled in this section.', icon: '✅' };
     }
 
-    // 3. Group Lock (If I don't have it, and group controls it)
     if (g && !isGroupLeader(g)) {
       return { state: 'group_locked', reason: 'Locked by your group leader.', icon: '👥' };
     }
 
-    // 4. Capacity
     const left = seatsLeft(sectionId);
     if (left !== null && left <= 0) {
       return { state: 'full', reason: 'No seats remaining.', icon: '🔒' };
     }
 
-    // 5. Time Conflict
     if (conflictsWithSelected(subjectId, sec)) {
       return { state: 'conflict', reason: 'Conflicts with another selection.', icon: '🚫' };
     }
 
-    // 6. Default
     return { state: 'available', reason: 'Available to take.', icon: '•' };
   }
 
   function stateClass(s: CardState) {
-    // Base: standard height, text size, border
     const base = 'h-8 px-2 text-xs rounded-md border w-full justify-between gap-2 transition-colors';
 
-    // Theme-aware colors:
-    // Uses text-primary-foreground (usually white/black depending on bg) for solid colors
     if (s === 'selected')
       return (
         base +
@@ -288,16 +279,11 @@
         base +
         ' bg-purple-600 text-white hover:bg-purple-700 dark:bg-purple-700 dark:hover:bg-purple-600 border-purple-600'
       );
-    if (s === 'pending') return base + ' bg-yellow-500 text-black border-yellow-500'; // Yellow usually needs black text
+    if (s === 'pending') return base + ' bg-yellow-500 text-black border-yellow-500';
     if (s === 'in_queue') return base + ' bg-blue-600 text-white border-blue-600';
-
-    // Full: Red
     if (s === 'full') return base + ' bg-red-600 text-white border-red-600 opacity-90';
-
-    // Conflict: Muted + Strikethrough
     if (s === 'conflict') return base + ' bg-muted text-muted-foreground line-through opacity-70 cursor-not-allowed';
 
-    // Available: Standard outline button style
     return base + ' bg-background hover:bg-accent hover:text-accent-foreground';
   }
 
@@ -371,13 +357,6 @@
     if (canActNow()) sendUserAction('group_drop', { groupId, subjectId });
   }
 
-  function doCancel(queueId: string) {
-    sendUserAction('cancel', { queueId });
-  }
-  function doCancelAll() {
-    sendUserAction('cancel_all');
-  }
-
   // --- Grid Helpers ---
   function theoryCellSections(pair: 'ST' | 'SW', subj: RelationSubject, row: number) {
     return subj.sections.filter((sec) => {
@@ -392,8 +371,6 @@
       return c && c.day === day && c.rowPair === rowPair;
     });
   }
-
-  const queueItems = $derived(currentQueue);
 
   onMount(() => {
     ensureUserWsConnected();
@@ -704,62 +681,7 @@
     </CardContent>
   </Card>
 
-  <Card>
-    <CardHeader class="flex flex-row items-center justify-between pb-2">
-      <CardTitle class="text-base">Queue</CardTitle>
-      {#if queueItems.some((i) => i.status === 'queued')}
-        <Button variant="outline" size="sm" class="h-7 text-xs" onclick={doCancelAll}>Cancel All</Button>
-      {/if}
-    </CardHeader>
-    <CardContent>
-      {#if queueItems.length === 0}
-        <div class="py-2 text-sm text-muted-foreground">Queue is empty.</div>
-      {:else}
-        <div class="grid gap-2">
-          {#each queueItems as item (item.id)}
-            <div class="relative flex flex-col gap-1 rounded-lg border p-3">
-              <div class="flex flex-wrap items-center justify-between gap-2 pr-8">
-                <div class="flex items-center gap-2">
-                  <Badge variant="outline">{item.action}</Badge>
-                  <Badge variant="secondary">{item.status}</Badge>
-                  {#if item.error}
-                    <Badge variant="destructive">{item.error.code}</Badge>
-                  {/if}
-                </div>
-                <div class="text-xs text-muted-foreground">
-                  {new Date(item.createdAtMs).toLocaleTimeString()}
-                </div>
-              </div>
-
-              {#if item.status === 'queued'}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  class="absolute top-2 right-2 h-6 w-6 text-muted-foreground hover:text-foreground"
-                  onclick={() => doCancel(item.id)}
-                  title="Cancel"
-                >
-                  <span class="text-xs">✕</span>
-                </Button>
-              {/if}
-
-              {#if item.payload}
-                <div class="text-xs break-all text-muted-foreground">
-                  payload: {JSON.stringify(item.payload)}
-                </div>
-              {/if}
-
-              {#if item.error?.message}
-                <div class="text-xs text-muted-foreground">
-                  {item.error.message}
-                </div>
-              {/if}
-            </div>
-          {/each}
-        </div>
-      {/if}
-    </CardContent>
-  </Card>
+  <QueuePanel />
 
   <Sheet.Root bind:open={sheetOpen}>
     <Sheet.Content side="bottom" class="p-0">

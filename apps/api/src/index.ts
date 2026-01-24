@@ -33,13 +33,15 @@ app.route('/auth/app', authAppRoute);
 // Better Auth passthrough
 app.on(['GET', 'POST'], '/auth/*', (c) => authHandler(c.env, c.req.raw));
 
+// Public endpoints
+app.route('/state.json', stateRoute);
+app.route('/relation.json', relationRoute);
+
 // Everything below requires app JWT
 app.use('*', requireJwt);
 
 app.route('/me', meRoute);
 app.route('/phase', phaseRoute);
-app.route('/state.json', stateRoute);
-app.route('/relation.json', relationRoute);
 
 // admin db debug
 app.use('/admin/db', requireRole(['admin']));

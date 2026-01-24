@@ -1,6 +1,6 @@
 import { atom } from 'nanostores';
 
-import { apiFetch } from '$lib/api/fetch';
+import { apiFetch } from '$lib/api';
 
 export type MePayload = {
   user: { id: string; email: string; role: 'student' | 'faculty' | 'admin' };

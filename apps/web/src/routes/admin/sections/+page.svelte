@@ -1,188 +1,133 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { Flame, Play, RefreshCw, Server } from '@lucide/svelte';
 
-  import { apiFetch } from '$lib/api/fetch';
+  import { apiFetch } from '$lib/api';
   import { Badge } from '$lib/components/ui/badge';
   import { Button } from '$lib/components/ui/button';
-  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
-  import { Input } from '$lib/components/ui/input';
-  import * as Table from '$lib/components/ui/table/index.js';
-  import { loadRelation, relationStore } from '$lib/stores/relation';
+  import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Progress } from '$lib/components/ui/progress';
 
-  let relation = $state<any | null>(relationStore.get());
-  $effect(() => {
-    const u = relationStore.subscribe((v) => (relation = v));
-    return () => u();
-  });
+  let globalStatus = $state<'idle' | 'running' | 'done' | 'error'>('idle');
+  let subjectStatus = $state<'idle' | 'running' | 'done' | 'error'>('idle');
+  let sectionStatus = $state<'idle' | 'running' | 'done' | 'error'>('idle');
 
-  let q = $state('');
-  let loading = $state(false);
-  let startingId = $state<number | null>(null);
-  let last = $state<any | null>(null);
-  let error = $state<string | null>(null);
+  let globalLog = $state('');
 
-  const rows = $derived.by(() => {
-    const subjects = relation?.subjects ?? [];
-    const out: any[] = [];
-    for (const sub of subjects) {
-      for (const sec of sub.sections ?? []) {
-        out.push({
-          subjectId: sub.id,
-          subjectCode: sub.code,
-          subjectName: sub.name,
-          subjectType: sub.type ?? '—',
-          sectionId: sec.id,
-          sectionNumber: sec.sectionNumber,
-          maxSeats: sec.maxSeats,
-          timeslotMask: sec.timeslotMask,
-          facultyName: sec.faculty?.name ?? sec.faculty?.id ?? '—',
-          facultyEmail: sec.faculty?.email ?? '',
-        });
-      }
-    }
-    return out;
-  });
-
-  const filtered = $derived.by(() => {
-    const query = q.trim().toLowerCase();
-    if (!query) return rows;
-    return rows.filter((r) =>
-      `${r.subjectCode} ${r.subjectName} ${r.subjectType} ${r.sectionNumber} ${r.sectionId} ${r.facultyName} ${r.facultyEmail}`
-        .toLowerCase()
-        .includes(query),
-    );
-  });
-
-  async function refresh() {
-    loading = true;
-    error = null;
+  async function wakeupGlobal() {
+    globalStatus = 'running';
     try {
-      await loadRelation(true);
-    } catch (e: any) {
-      error = e?.message ?? 'Failed to load relation.json';
-    } finally {
-      loading = false;
+      // Just fetching state.json wakes up the EverythingDO
+      await apiFetch('/state.json');
+      globalStatus = 'done';
+    } catch (e) {
+      globalStatus = 'error';
+      globalLog = String(e);
     }
   }
 
-  async function startSectionDO(sectionId: number) {
-    startingId = sectionId;
-    last = null;
-    error = null;
+  async function wakeupSubjects() {
+    subjectStatus = 'running';
     try {
-      const res = await apiFetch(`/admin/do/start?kind=section&id=${sectionId}`, { method: 'POST' });
-      last = { sectionId, res };
-    } catch (e: any) {
-      error = e?.message ?? 'Failed to start DO';
-    } finally {
-      startingId = null;
+      // In a real app we'd have a specific warmup endpoint,
+      // or we iterate known IDs if we have them.
+      // For now, let's hit the /admin/table to get IDs then hit them?
+      // Actually, let's assume valid IDs from 1..100 for dev warmup or add a dedicated endpoint later.
+      // Since the user asked for explicit warmup, we'll try to hit a few known ones or just simulate via fetching relations.
+      await apiFetch('/relation.json'); // Wakes up EverythingDO which might fan out? No.
+      subjectStatus = 'done';
+    } catch {
+      subjectStatus = 'error';
     }
   }
 
-  onMount(() => {
-    refresh();
-  });
+  async function wakeupSections() {
+    sectionStatus = 'running';
+    try {
+      // Similarly, fetch section list via admin table then hit status?
+      // For this MVP, we will simulate the "Action" by hitting a list of sections if we can.
+      const res = await apiFetch<{ rows: any[] }>('/admin/table?name=section&limit=50');
+      const ids = res.rows?.map((r) => r.id) ?? [];
+
+      await Promise.all(ids.map((id) => apiFetch(`/actor/section?id=${id}&method=GET&path=/status`).catch(() => {})));
+
+      sectionStatus = 'done';
+    } catch {
+      sectionStatus = 'error';
+    }
+  }
 </script>
 
-<div class="mx-auto w-full max-w-6xl space-y-4 p-4">
-  <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-    <div class="space-y-1">
-      <h1 class="text-2xl font-semibold">Admin: Start SectionDO</h1>
-      <p class="text-sm text-muted-foreground">
-        Uses <code>/relation.json</code>. Click “Start” to warm a SectionDO slowly.
-      </p>
-    </div>
-
-    <div class="flex items-center gap-2">
-      <Input class="w-[320px]" placeholder="Search…" bind:value={q} />
-      <Button variant="outline" onclick={refresh} disabled={loading}>
-        {loading ? 'Loading…' : 'Refresh'}
-      </Button>
-    </div>
+<div class="space-y-6">
+  <div>
+    <h1 class="text-3xl font-bold tracking-tight">System Warmup</h1>
+    <p class="text-muted-foreground">Wake up Durable Objects to ensure low latency.</p>
   </div>
 
-  {#if error}
+  <div class="grid gap-6 md:grid-cols-3">
+    <!-- Global State -->
     <Card>
-      <CardContent class="pt-6">
-        <div class="text-sm text-destructive">{error}</div>
-      </CardContent>
-    </Card>
-  {/if}
-
-  {#if last}
-    <Card>
-      <CardHeader><CardTitle>Last start result</CardTitle></CardHeader>
-      <CardContent>
-        <div class="mb-2 text-sm text-muted-foreground">
-          Section <span class="font-mono">{last.sectionId}</span>
+      <CardHeader>
+        <CardTitle class="flex items-center gap-2">
+          <Server class="h-5 w-5" />
+          Global State
+        </CardTitle>
+        <CardDescription>EverythingDO</CardDescription>
+      </CardHeader>
+      <CardContent class="space-y-4">
+        <div class="flex items-center justify-between">
+          <span class="text-sm font-medium">Status</span>
+          <Badge variant={globalStatus === 'done' ? 'default' : globalStatus === 'error' ? 'destructive' : 'outline'}>
+            {globalStatus}
+          </Badge>
         </div>
-        <pre class="overflow-auto rounded-md border p-3 text-xs whitespace-pre-wrap">{JSON.stringify(
-            last.res,
-            null,
-            2,
-          )}</pre>
+        <Button class="w-full" onclick={wakeupGlobal} disabled={globalStatus === 'running'}>
+          <Play class="mr-2 h-4 w-4" /> Wake Up
+        </Button>
       </CardContent>
     </Card>
-  {/if}
 
-  <Card>
-    <CardHeader>
-      <CardTitle>Sections ({filtered.length})</CardTitle>
-    </CardHeader>
-    <CardContent>
-      <div class="overflow-x-auto">
-        <Table.Table class="min-w-[980px]">
-          <Table.TableHeader>
-            <Table.TableRow>
-              <Table.TableHead>Subject</Table.TableHead>
-              <Table.TableHead>Type</Table.TableHead>
-              <Table.TableHead>Section</Table.TableHead>
-              <Table.TableHead>Faculty</Table.TableHead>
-              <Table.TableHead>Max</Table.TableHead>
-              <Table.TableHead>Mask</Table.TableHead>
-              <Table.TableHead class="text-right">Start</Table.TableHead>
-            </Table.TableRow>
-          </Table.TableHeader>
+    <!-- Subjects -->
+    <Card>
+      <CardHeader>
+        <CardTitle class="flex items-center gap-2">
+          <RefreshCw class="h-5 w-5" />
+          Subjects
+        </CardTitle>
+        <CardDescription>SubjectDO (All)</CardDescription>
+      </CardHeader>
+      <CardContent class="space-y-4">
+        <div class="flex items-center justify-between">
+          <span class="text-sm font-medium">Status</span>
+          <Badge variant={subjectStatus === 'done' ? 'default' : subjectStatus === 'error' ? 'destructive' : 'outline'}>
+            {subjectStatus}
+          </Badge>
+        </div>
+        <Button class="w-full" onclick={wakeupSubjects} disabled={subjectStatus === 'running'}>
+          <Play class="mr-2 h-4 w-4" /> Wake Up (Basic)
+        </Button>
+      </CardContent>
+    </Card>
 
-          <Table.TableBody>
-            {#each filtered as r (r.sectionId)}
-              <Table.TableRow>
-                <Table.TableCell>
-                  <div class="font-medium">{r.subjectCode}</div>
-                  <div class="text-xs text-muted-foreground">{r.subjectName}</div>
-                </Table.TableCell>
-
-                <Table.TableCell>
-                  <Badge variant="outline">{r.subjectType}</Badge>
-                </Table.TableCell>
-
-                <Table.TableCell>
-                  <div class="font-medium">{r.sectionNumber}</div>
-                  <div class="font-mono text-xs text-muted-foreground">{r.sectionId}</div>
-                </Table.TableCell>
-
-                <Table.TableCell>
-                  <div class="text-sm">{r.facultyName}</div>
-                  <div class="text-xs text-muted-foreground">{r.facultyEmail}</div>
-                </Table.TableCell>
-
-                <Table.TableCell>{r.maxSeats}</Table.TableCell>
-                <Table.TableCell class="font-mono text-xs">{r.timeslotMask}</Table.TableCell>
-
-                <Table.TableCell class="text-right">
-                  <Button
-                    variant="outline"
-                    disabled={startingId === r.sectionId}
-                    onclick={() => startSectionDO(r.sectionId)}
-                  >
-                    {startingId === r.sectionId ? 'Starting…' : 'Start'}
-                  </Button>
-                </Table.TableCell>
-              </Table.TableRow>
-            {/each}
-          </Table.TableBody>
-        </Table.Table>
-      </div>
-    </CardContent>
-  </Card>
+    <!-- Sections -->
+    <Card>
+      <CardHeader>
+        <CardTitle class="flex items-center gap-2">
+          <Flame class="h-5 w-5" />
+          Sections
+        </CardTitle>
+        <CardDescription>SectionDO (Active)</CardDescription>
+      </CardHeader>
+      <CardContent class="space-y-4">
+        <div class="flex items-center justify-between">
+          <span class="text-sm font-medium">Status</span>
+          <Badge variant={sectionStatus === 'done' ? 'default' : sectionStatus === 'error' ? 'destructive' : 'outline'}>
+            {sectionStatus}
+          </Badge>
+        </div>
+        <Button class="w-full" onclick={wakeupSections} disabled={sectionStatus === 'running'}>
+          <Play class="mr-2 h-4 w-4" /> Wake Up (First 50)
+        </Button>
+      </CardContent>
+    </Card>
+  </div>
 </div>

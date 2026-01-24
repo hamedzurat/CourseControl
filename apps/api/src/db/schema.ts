@@ -93,7 +93,8 @@ export const jwks = sqliteTable(
   {
     id: text('id').primaryKey(),
     kid: text('kid').notNull(),
-    key: text('key').notNull(), // JWK JSON string
+    publicKey: text('publicKey').notNull(),
+    privateKey: text('privateKey').notNull(),
     createdAt: integer('createdAt', { mode: 'timestamp_ms' }).notNull(),
   },
   (t) => ({

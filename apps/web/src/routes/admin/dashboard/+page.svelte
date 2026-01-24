@@ -1,39 +1,77 @@
 <script lang="ts">
+  import { Activity, Database, Server, Users } from '@lucide/svelte';
   import { onMount } from 'svelte';
 
-  import { Button } from '$lib/components/ui/button';
-  import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '$lib/components/ui/card';
-  import { requireRole } from '$lib/guards';
+  import { apiFetch } from '$lib/api';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 
-  onMount(() => {
-    requireRole('admin');
-  });
+  let phase = $state<any>(null);
+  let stats = $state<any>(null);
+
+  async function load() {
+    phase = await apiFetch('/phase').catch(() => null);
+    // Future: authentic stats endpoint
+    stats = {
+      users: (await apiFetch<{ rows: any[] }>('/admin/table?name=user&limit=1')).rows?.length ?? 0, // rough check if table works
+      sections: (await apiFetch<{ rows: any[] }>('/admin/table?name=section&limit=1')).rows?.length ?? 0,
+    };
+  }
+
+  onMount(load);
 </script>
 
 <div class="space-y-6">
-  <div class="space-y-1">
-    <h1 class="text-2xl font-semibold">Admin</h1>
-    <p class="text-sm text-muted-foreground">Debug tools for D1 + backend state.</p>
+  <div class="flex items-center justify-between">
+    <h1 class="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
   </div>
 
-  <div class="grid gap-4 sm:grid-cols-2">
+  <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
     <Card>
-      <CardHeader class="space-y-2">
-        <CardTitle class="text-lg">DB Tables</CardTitle>
-        <CardDescription>Browse and inspect rows from any D1 table.</CardDescription>
+      <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle class="text-sm font-medium">System Phase</CardTitle>
+        <Activity class="h-4 w-4 text-muted-foreground" />
       </CardHeader>
       <CardContent>
-        <Button href="/admin/db" class="w-full">Open Table Browser</Button>
+        <div class="text-2xl font-bold capitalize">{phase?.phase ?? 'Unknown'}</div>
+        <p class="text-xs text-muted-foreground">Global Lifecycle State</p>
       </CardContent>
     </Card>
 
     <Card>
-      <CardHeader class="space-y-2">
-        <CardTitle class="text-lg">More tools later</CardTitle>
-        <CardDescription>We’ll add notifications creator, seed viewer, etc.</CardDescription>
+      <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle class="text-sm font-medium">Database Connection</CardTitle>
+        <Database class="h-4 w-4 text-muted-foreground" />
       </CardHeader>
       <CardContent>
-        <Button variant="outline" class="w-full" href="/help">Help</Button>
+        {#if stats}
+          <div class="text-2xl font-bold text-green-600">Online</div>
+          <p class="text-xs text-muted-foreground">D1 / Durable Objects Active</p>
+        {:else}
+          <div class="text-2xl font-bold text-yellow-600">Checking...</div>
+        {/if}
+      </CardContent>
+    </Card>
+
+    <Card>
+      <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle class="text-sm font-medium">Active Users</CardTitle>
+        <Users class="h-4 w-4 text-muted-foreground" />
+      </CardHeader>
+      <CardContent>
+        <!-- Mock stats for now, real stats would need a specific endpoint -->
+        <div class="text-2xl font-bold">--</div>
+        <p class="text-xs text-muted-foreground">Connected via WebSocket</p>
+      </CardContent>
+    </Card>
+
+    <Card>
+      <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle class="text-sm font-medium">Infrastructure</CardTitle>
+        <Server class="h-4 w-4 text-muted-foreground" />
+      </CardHeader>
+      <CardContent>
+        <div class="text-2xl font-bold">Cloudflare</div>
+        <p class="text-xs text-muted-foreground">Workers + DO + D1</p>
       </CardContent>
     </Card>
   </div>

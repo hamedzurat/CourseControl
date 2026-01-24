@@ -2,7 +2,7 @@
   import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
   import { ContextMenu as ContextMenuPrimitive } from 'bits-ui';
 
-  import { cn, type WithoutChild } from '$lib/utils.js';
+  import { cn, type WithoutChild } from '$lib/utils';
 
   let {
     ref = $bindable(null),

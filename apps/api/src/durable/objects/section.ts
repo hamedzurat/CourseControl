@@ -1,7 +1,7 @@
 import type { DurableObjectState } from '@cloudflare/workers-types';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 
-import { notification as notificationTable, sectionSelection, section as sectionTable } from '../../db/schema';
+import { baUser, notification as notificationTable, sectionSelection, section as sectionTable } from '../../db/schema';
 import type { Env } from '../../env';
 import { getDb } from '../../lib/db';
 import { AppError, asAppError } from '../utils/errors';
@@ -356,10 +356,39 @@ export class SectionDO {
       if (path === '/status' && req.method === 'GET') {
         const meta = await this.ensureMeta(req);
         const members = await this.readMembers();
+
+        let membersWithNames = members.map((m) => ({ ...m, name: m.studentUserId }));
+
+        if (members.length > 0) {
+          try {
+            const ids = members.map((m) => m.studentUserId);
+            const db = getDb(this.env);
+            const users = await db
+              .select({
+                id: baUser.id,
+                name: baUser.name,
+              })
+              .from(baUser)
+              .where(inArray(baUser.id, ids));
+
+            const nameMap = new Map<string, string>();
+            for (const u of users) {
+              nameMap.set(u.id, u.name);
+            }
+
+            membersWithNames = members.map((m) => ({
+              ...m,
+              name: nameMap.get(m.studentUserId) || m.studentUserId,
+            }));
+          } catch (e) {
+            console.error('Failed to hydrate names', e);
+          }
+        }
+
         return json({
           meta,
           seats: members.length,
-          members,
+          members: membersWithNames,
         });
       }
 

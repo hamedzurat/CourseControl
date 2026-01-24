@@ -1,8 +1,18 @@
-import { apiFetch } from '$lib/api/fetch';
+import { apiFetch } from '$lib/api';
+
+export type NotificationItem = {
+  id: string;
+  createdAtMs: number;
+  title: string;
+  body: string;
+  createdByUserId: string;
+  audienceRole?: string | null;
+  audienceUserId?: string | null;
+};
 
 export async function pollNotifications(sinceMs?: number) {
   const qs = sinceMs ? `?sinceMs=${encodeURIComponent(String(sinceMs))}` : '';
-  return apiFetch<{ nowMs: number; sinceMs: number; items: any[] }>(`/notification/poll${qs}`);
+  return apiFetch<{ nowMs: number; sinceMs: number; items: NotificationItem[] }>(`/notification/poll${qs}`);
 }
 
 export async function createNotification(input: {

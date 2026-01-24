@@ -18,6 +18,6 @@ authAppRoute.post('/token', async (c) => {
     if (e instanceof HttpError) {
       return c.json({ error: e.code, message: e.message }, { status: e.status } as any);
     }
-    return c.json({ error: 'INTERNAL', message: 'Failed to mint token' }, { status: 500 } as any);
+    return c.json({ error: 'INTERNAL', message: e?.message ?? 'Failed to mint token' }, { status: 500 } as any);
   }
 });
